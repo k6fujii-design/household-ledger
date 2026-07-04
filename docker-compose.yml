@@ -1,0 +1,44 @@
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:2.5.4
+    user: root
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-dbPath", "/home/dynamodblocal/data"]
+    ports:
+      - "8001:8000"
+    volumes:
+      - dynamodb_data:/home/dynamodblocal/data
+
+  backend:
+    build: ./backend
+    environment:
+      AWS_REGION: ${AWS_REGION:-ap-northeast-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-local}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-local}
+      DYNAMODB_TABLE_NAME: ${DYNAMODB_TABLE_NAME:-household-budget-app}
+      DYNAMODB_ENDPOINT_URL: ${DYNAMODB_ENDPOINT_URL:-http://dynamodb:8000}
+      DYNAMODB_AUTO_CREATE: ${DYNAMODB_AUTO_CREATE:-true}
+      SESSION_SECRET: ${SESSION_SECRET:-change-me-local-secret}
+      INITIAL_USER_PASSWORD: ${INITIAL_USER_PASSWORD:-password}
+      INITIAL_USER_1_NAME: ${INITIAL_USER_1_NAME:-User 1}
+      INITIAL_USER_2_NAME: ${INITIAL_USER_2_NAME:-User 2}
+      TZ: Asia/Tokyo
+    ports:
+      - "8000:8000"
+    depends_on:
+      - dynamodb
+    volumes:
+      - ./backend/app:/app/app
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+
+volumes:
+  dynamodb_data:
