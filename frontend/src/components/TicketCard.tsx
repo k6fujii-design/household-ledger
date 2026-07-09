@@ -13,8 +13,9 @@ export function TicketCard({ ticket, users, onClick }: { ticket: Ticket; users: 
           <strong>{ticket.title}</strong>
           <StatusBadge status={ticket.status} />
         </div>
+        <div className="ticket-id">チケットID: {ticket.display_id || "-"}</div>
         <div className="muted">{ticket.date} / 支払: {ticket.payer_name}</div>
-        {ticket.category && <div className="category-pill">{ticket.category}</div>}
+        <div className={ticket.category ? "category-pill" : "category-pill unspecified"}>{ticket.category || "未指定"}</div>
         <div className="split">
           <span>{pair.first} {formatYen(ticket.share_f)}</span>
           <span>{pair.second} {formatYen(ticket.share_o)}</span>

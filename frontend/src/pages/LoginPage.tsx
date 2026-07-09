@@ -1,8 +1,10 @@
-import { LogIn } from "lucide-react";
+import { ExternalLink, Github, LogIn } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { api } from "../api/client";
 import { BrandMark } from "../components/BrandMark";
+
+const technicalDetailsUrl = "https://github.com/k6fujii-design/household-ledger/tree/main";
 
 export function LoginPage({ onLogin }: { onLogin: () => Promise<void> }) {
   const [email, setEmail] = useState("f@example.com");
@@ -32,7 +34,11 @@ export function LoginPage({ onLogin }: { onLogin: () => Promise<void> }) {
           <label>パスワード<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
           <button type="submit"><LogIn size={18} />ログイン</button>
         </form>
-        <div className="hint">初期ログイン: f@example.com または o@example.com / password</div>
+        <a href={technicalDetailsUrl} target="_blank" rel="noreferrer" className="external-link-button login-tech-link">
+          <Github size={18} />
+          技術詳細を見る
+          <ExternalLink size={16} />
+        </a>
       </section>
     </main>
   );

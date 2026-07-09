@@ -4,6 +4,7 @@ export type TicketStatus = "new" | "settled" | "canceled";
 
 export type Ticket = {
   id: string;
+  display_id: number;
   date: string;
   title: string;
   amount: number;

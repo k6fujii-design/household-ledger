@@ -81,18 +81,32 @@ export default function App() {
     setView("create");
   };
 
+  const createTicketOnDate = (date: string) => {
+    setCloneDraft({
+      date,
+      title: "",
+      amount: 1000,
+      payer_user_id: users[0]?.id || "",
+      ratio_f: 5,
+      ratio_o: 5,
+      status: "new",
+      category: "",
+      memo: ""
+    });
+    setView("create");
+  };
+
   return (
     <div className="app-shell">
-      {view === "home" && <HomePage users={users} settings={settings} setView={setView} openEdit={openEdit} />}
+      {view === "home" && <HomePage users={users} categories={categories} settings={settings} setView={setView} openEdit={openEdit} />}
       {view === "tickets" && <TicketListPage users={users} categories={categories} setView={setView} openEdit={openEdit} />}
       {view === "create" && <TicketCreatePage users={users} categories={categories} templates={templates} draft={cloneDraft} setView={setView} onDone={() => setCloneDraft(null)} />}
       {view === "edit" && editId && <TicketEditPage id={editId} users={users} categories={categories} templates={templates} setView={setView} onClone={cloneTicket} />}
       {view === "summary" && <SummaryPage users={users} categories={categories} settings={settings} />}
-      {view === "calendar" && <CalendarPage users={users} categories={categories} openEdit={openEdit} />}
+      {view === "calendar" && <CalendarPage users={users} categories={categories} openEdit={openEdit} openCreate={createTicketOnDate} />}
       {view === "history" && <HistoryPage openEdit={openEdit} />}
-      {view === "settings" && <SettingsPage user={user} users={users} categories={categories} templates={templates} settings={settings} onSharedChange={loadShared} onLogout={() => { setUser(null); setView("home"); }} />}
+      {view === "settings" && <SettingsPage user={user} users={users} categories={categories} templates={templates} settings={settings} onSharedChange={loadShared} openEdit={openEdit} onLogout={() => { setUser(null); setView("home"); }} />}
       <BottomNav view={view} setView={setView} />
-      {view !== "create" && <button className="fab" onClick={() => { setCloneDraft(null); setView("create"); }} aria-label="チケット追加">+</button>}
     </div>
   );
 }

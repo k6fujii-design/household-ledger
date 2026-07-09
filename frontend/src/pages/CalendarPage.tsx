@@ -1,8 +1,9 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { CalendarDay, CalendarMonthSummary, Category, Ticket, TicketStatus, User } from "../types";
 import { compactYen, formatYen, userPair } from "../utils/display";
+import { swipeDirection, type TouchPoint } from "../utils/swipe";
 
 type CalendarFilter = "all" | TicketStatus;
 type CalendarMode = "month" | "year";
@@ -23,7 +24,7 @@ const statusLabel: Record<CalendarFilter, string> = {
 
 const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
 
-export function CalendarPage({ users, categories, openEdit }: { users: User[]; categories: Category[]; openEdit: (id: string) => void }) {
+export function CalendarPage({ users, categories, openEdit, openCreate }: { users: User[]; categories: Category[]; openEdit: (id: string) => void; openCreate: (date: string) => void }) {
   const today = new Date();
   const [mode, setMode] = useState<CalendarMode>("month");
   const [year, setYear] = useState(today.getFullYear());
@@ -34,7 +35,8 @@ export function CalendarPage({ users, categories, openEdit }: { users: User[]; c
   const [yearMonths, setYearMonths] = useState<CalendarMonthSummary[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchStart, setTouchStart] = useState<TouchPoint | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
   const pair = userPair(users);
   const dayMap = useMemo(() => Object.fromEntries(days.map((d) => [d.date, d])), [days]);
   const visibleTotal = useMemo(() => {
@@ -73,6 +75,13 @@ export function CalendarPage({ users, categories, openEdit }: { users: User[]; c
     setTickets(await api.tickets(`?${params.toString()}`));
   }
 
+  async function selectDate(date: string) {
+    await pick(date);
+    if (confirm(`${date} のチケットを新規作成しますか？`)) {
+      openCreate(date);
+    }
+  }
+
   useEffect(() => {
     if (selected && mode === "month") pick(selected);
   }, [filter, category]);
@@ -87,11 +96,11 @@ export function CalendarPage({ users, categories, openEdit }: { users: User[]; c
     setSelected(null);
   }
 
-  function handleTouchEnd(x: number) {
-    if (mode !== "month" || touchStartX === null) return;
-    const delta = x - touchStartX;
-    if (Math.abs(delta) > 50) move(delta > 0 ? -1 : 1);
-    setTouchStartX(null);
+  function handleTouchEnd(point: TouchPoint) {
+    if (mode !== "month") return setTouchStart(null);
+    const direction = swipeDirection(touchStart, point);
+    if (direction) move(direction);
+    setTouchStart(null);
   }
 
   function openMonth(targetMonth: number) {
@@ -107,27 +116,30 @@ export function CalendarPage({ users, categories, openEdit }: { users: User[]; c
   ];
 
   return (
-    <main className="screen" onTouchStart={(e) => setTouchStartX(e.changedTouches[0].clientX)} onTouchEnd={(e) => handleTouchEnd(e.changedTouches[0].clientX)}>
+    <main className="screen" onTouchStart={(e) => setTouchStart({ x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY })} onTouchEnd={(e) => handleTouchEnd({ x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY })}>
+      <div className="summary-tabs">
+        <button className={mode === "month" ? "on" : ""} onClick={() => setMode("month")}>月次</button>
+        <button className={mode === "year" ? "on" : ""} onClick={() => { setMode("year"); setSelected(null); }}>年次</button>
+      </div>
       <header className="month-head">
         <button onClick={() => move(-1)} aria-label={mode === "year" ? "前年" : "前月"}><ChevronLeft /></button>
         <h1>{mode === "year" ? `${year}年` : `${year}年${month}月`}</h1>
         <button onClick={() => move(1)} aria-label={mode === "year" ? "翌年" : "翌月"}><ChevronRight /></button>
       </header>
-      <div className="segmented">
-        <button className={mode === "month" ? "on" : ""} onClick={() => setMode("month")}>月次</button>
-        <button className={mode === "year" ? "on" : ""} onClick={() => { setMode("year"); setSelected(null); }}>年次</button>
-      </div>
+      <button className="secondary filter-toggle" onClick={() => setShowFilters(!showFilters)}><SlidersHorizontal size={18} />フィルター</button>
+      {showFilters && <section className="calendar-filter-panel">
+        <div className="segmented">
+          {(Object.keys(statusLabel) as CalendarFilter[]).map((key) => <button key={key} className={filter === key ? "on" : ""} onClick={() => setFilter(key)}>{statusLabel[key]}</button>)}
+        </div>
+        <select className="calendar-category" value={category} onChange={(e) => setCategory(e.target.value)}>
+          <option value="">全カテゴリ</option>
+          {categories.map((row) => <option key={row.id} value={row.name}>{row.name}</option>)}
+        </select>
+      </section>}
       <section className="calendar-summary">
         <span>{mode === "year" ? "年次表示合計" : "月次表示合計"}</span>
         <strong>{formatYen(visibleTotal)}</strong>
       </section>
-      <div className="segmented">
-        {(Object.keys(statusLabel) as CalendarFilter[]).map((key) => <button key={key} className={filter === key ? "on" : ""} onClick={() => setFilter(key)}>{statusLabel[key]}</button>)}
-      </div>
-      <select className="calendar-category" value={category} onChange={(e) => setCategory(e.target.value)}>
-        <option value="">全カテゴリ</option>
-        {categories.map((row) => <option key={row.id} value={row.name}>{row.name}</option>)}
-      </select>
 
       {mode === "year" ? (
         <div className="year-grid">
@@ -150,18 +162,22 @@ export function CalendarPage({ users, categories, openEdit }: { users: User[]; c
             const weekday = new Date(date).getDay();
             const weekendClass = weekday === 0 ? " sunday" : weekday === 6 ? " saturday" : "";
             return (
-              <button key={date} onClick={() => pick(date)} className={`${selected === date ? "day selected" : "day"}${weekendClass}`}>
+              <button key={date} onClick={() => selectDate(date)} className={`${selected === date ? "day selected" : "day"}${weekendClass}`}>
                 <strong>{Number(date.slice(-2))}</strong>
                 {d && <>
                   <span className="day-total">{compactYen(d.total_amount)}</span>
                   <small>{d.ticket_count}件</small>
-                  <small>{pair.first}: {compactYen(d.paid_by_f)}</small>
-                  <small>{pair.second}: {compactYen(d.paid_by_o)}</small>
                 </>}
               </button>
             );
           })}</div>
-          {selected && <><h2>{selected}</h2><div className="list">{tickets.map((t) => <button className="mini-ticket" key={t.id} onClick={() => openEdit(t.id)}>{t.title}<span>{formatYen(t.amount)}</span></button>)}</div></>}
+          {selected && <>
+            <div className="selected-day-head">
+              <h2>{selected}</h2>
+              <button onClick={() => openCreate(selected)}>この日に記録する</button>
+            </div>
+            <div className="list">{tickets.map((t) => <button className="mini-ticket" key={t.id} onClick={() => openEdit(t.id)}>{t.title}<span>{formatYen(t.amount)}</span></button>)}</div>
+          </>}
         </>
       )}
     </main>

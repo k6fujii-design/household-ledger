@@ -6,6 +6,7 @@ import * as integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as s3 from "aws-cdk-lib/aws-s3";
@@ -29,6 +30,13 @@ export class HouseholdBudgetStack extends Stack {
       removalPolicy: RemovalPolicy.DESTROY
     });
 
+    const initialUserPasswordParameterName = this.node.tryGetContext("initialUserPasswordParameterName") || "/household-ledger/initial-user-password";
+    const initialUserPasswordParameterArn = Stack.of(this).formatArn({
+      service: "ssm",
+      resource: "parameter",
+      resourceName: initialUserPasswordParameterName.replace(/^\//, "")
+    });
+
     const backend = new lambda.DockerImageFunction(this, "BackendFunction", {
       code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, "../../backend"), {
         file: "Dockerfile.lambda"
@@ -41,12 +49,16 @@ export class HouseholdBudgetStack extends Stack {
         DYNAMODB_TABLE_NAME: table.tableName,
         DYNAMODB_AUTO_CREATE: "false",
         SESSION_SECRET: this.node.tryGetContext("sessionSecret") || "change-me-after-deploy",
-        INITIAL_USER_PASSWORD: this.node.tryGetContext("initialUserPassword") || "password",
+        INITIAL_USER_PASSWORD_PARAMETER_NAME: initialUserPasswordParameterName,
         INITIAL_USER_1_NAME: this.node.tryGetContext("initialUser1Name") || "User 1",
         INITIAL_USER_2_NAME: this.node.tryGetContext("initialUser2Name") || "User 2"
       }
     });
     table.grantReadWriteData(backend);
+    backend.addToRolePolicy(new iam.PolicyStatement({
+      actions: ["ssm:GetParameter"],
+      resources: [initialUserPasswordParameterArn]
+    }));
 
     const httpApi = new apigwv2.HttpApi(this, "HttpApi", {
       apiName: "household-budget-api",
@@ -101,6 +113,10 @@ export class HouseholdBudgetStack extends Stack {
 
     new CfnOutput(this, "DynamoDbTableName", {
       value: table.tableName
+    });
+
+    new CfnOutput(this, "InitialUserPasswordParameterName", {
+      value: initialUserPasswordParameterName
     });
   }
 }

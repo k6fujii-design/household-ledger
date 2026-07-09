@@ -43,6 +43,7 @@ class TicketUpdate(TicketBase):
 
 class TicketOut(TicketBase):
     id: UUID
+    display_id: int
     share_f: int
     share_o: int
     created_by: UUID

@@ -1,6 +1,6 @@
-<mxfile host="app.diagrams.net" agent="Codex">
+<mxfile host="app.diagrams.net" agent="Codex" pages="2">
   <diagram id="household-ledger-aws" name="AWS Architecture">
-    <mxGraphModel dx="2237" dy="1466" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+    <mxGraphModel dx="1991" dy="1188" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -80,10 +80,10 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="TqmDyHNqUhd89pTMjKKj-158" parent="TqmDyHNqUhd89pTMjKKj-192" style="sketch=0;html=1;aspect=fixed;shape=mxgraph.aws4.cloudwatch;fillColor=#E7157B;strokeColor=none;" value="" vertex="1">
-          <mxGeometry height="92" width="92" x="1341.0010432942709" y="345.9955216471357" as="geometry" />
+          <mxGeometry height="92" width="92" x="1341.0010432942709" y="259.9955216471357" as="geometry" />
         </mxCell>
         <mxCell id="TqmDyHNqUhd89pTMjKKj-159" parent="TqmDyHNqUhd89pTMjKKj-192" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;fontSize=15;fontStyle=1;fontColor=#232F3E;" value="Amazon CloudWatch Logs" vertex="1">
-          <mxGeometry height="65.06" width="275" x="1244.6" y="450" as="geometry" />
+          <mxGeometry height="65.06" width="275" x="1244.6" y="360" as="geometry" />
         </mxCell>
         <mxCell id="TqmDyHNqUhd89pTMjKKj-156" parent="TqmDyHNqUhd89pTMjKKj-192" style="sketch=0;html=1;aspect=fixed;shape=mxgraph.aws4.dynamodb;fillColor=#527FFF;strokeColor=none;" value="" vertex="1">
           <mxGeometry height="92" width="92" x="1220.0010432942709" y="142.55552164713572" as="geometry" />
@@ -171,9 +171,30 @@
         <mxCell id="TqmDyHNqUhd89pTMjKKj-210" parent="TqmDyHNqUhd89pTMjKKj-192" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=14;fontColor=#232F3E;" value="Data protection&#xa;DynamoDB table: RETAIN&#xa;S3 bucket: RETAIN" vertex="1">
           <mxGeometry height="90" width="200" x="1341" y="140" as="geometry" />
         </mxCell>
+        <mxCell id="fV3jFzGABUeG9oOMToaH-1" parent="TqmDyHNqUhd89pTMjKKj-192" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.parameter_store;" value="" vertex="1">
+          <mxGeometry height="78" width="75" x="1150" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="fV3jFzGABUeG9oOMToaH-3" parent="TqmDyHNqUhd89pTMjKKj-192" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;fontSize=15;fontStyle=1;fontColor=#232F3E;" value="AWS Systems Manager&lt;br&gt;Parameter Store" vertex="1">
+          <mxGeometry height="65.06" width="275" x="1050" y="450" as="geometry" />
+        </mxCell>
         <mxCell id="TqmDyHNqUhd89pTMjKKj-205" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;fontSize=15;fontStyle=1;fontColor=#232F3E;" value="Amazon DynamoDB" vertex="1">
           <mxGeometry height="82.56" width="216.22" x="2020" y="677.44" as="geometry" />
         </mxCell>
+        <mxCell id="fV3jFzGABUeG9oOMToaH-2" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeWidth=2;strokeColor=#E7157B;fontSize=13;fontStyle=1;fontColor=#232F3E;" value="read">
+          <mxGeometry relative="1" x="0.0009" as="geometry">
+            <mxPoint as="offset" />
+            <mxPoint x="1725" y="853" as="sourcePoint" />
+            <mxPoint x="1993" y="852" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="uv-ORpduQ6ir8RajzW00" name="ページ-2">
+    <mxGraphModel dx="1344" dy="1026" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
       </root>
     </mxGraphModel>
   </diagram>

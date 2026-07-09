@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     session_secret: str = "change-me-local-secret"
     initial_user_password: str = "password"
+    initial_user_password_parameter_name: str | None = None
     initial_user_1_name: str = "User 1"
     initial_user_2_name: str = "User 2"
     aws_region: str = "ap-northeast-1"

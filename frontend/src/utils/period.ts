@@ -17,6 +17,14 @@ export function periodKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
+export function monthLabel(date: Date) {
+  return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+}
+
+export function addMonths(date: Date, diff: number) {
+  return new Date(date.getFullYear(), date.getMonth() + diff, 1);
+}
+
 function toPeriod(from: Date, to: Date) {
   return {
     from: toDateInput(from),

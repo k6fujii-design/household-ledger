@@ -21,7 +21,14 @@ export function TicketCreatePage({
   async function submit(payload: TicketInput) {
     await api.createTicket(payload);
     onDone();
-    setView("tickets");
+    setView("home");
   }
-  return <main className="screen"><header className="top"><h1>{draft ? "コピーして新規作成" : "新規チケット"}</h1></header><TicketForm users={users} categories={categories} templates={templates} draft={draft} onSubmit={submit} onCancel={() => { onDone(); setView("tickets"); }} /></main>;
+  return (
+    <main className="screen record-screen">
+      <header className="record-head">
+        <h1>{draft ? "コピーして新規作成" : "新規チケット"}</h1>
+      </header>
+      <TicketForm users={users} categories={categories} templates={templates} draft={draft} onSubmit={submit} onCancel={() => { onDone(); setView("home"); }} />
+    </main>
+  );
 }

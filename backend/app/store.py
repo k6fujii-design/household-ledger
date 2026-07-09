@@ -11,6 +11,7 @@ from boto3.dynamodb.conditions import Key
 
 from app.core.config import settings
 from app.core.security import hash_password, verify_password
+from app.core.secrets import initial_user_password
 from app.schemas.ticket import TicketCreate, TicketUpdate
 
 
@@ -110,13 +111,14 @@ class DynamoStore:
         return rows
 
     def seed_users(self) -> None:
+        password = initial_user_password()
         for name, email in [
             (settings.initial_user_1_name, "f@example.com"),
             (settings.initial_user_2_name, "o@example.com"),
         ]:
             user = self.get_user_by_email(email)
             item = user or {"id": str(uuid4()), "email": email, "name": name}
-            item["password_hash"] = hash_password(settings.initial_user_password)
+            item["password_hash"] = hash_password(password)
             self._put("USER", item["id"], item)
 
     def list_users(self) -> list[dict[str, Any]]:
@@ -220,6 +222,7 @@ class DynamoStore:
             "created_at": timestamp,
             "deleted_at": None,
         }
+        row.pop("display_id", None)
         row.update({
             "date": payload.date.isoformat(),
             "title": payload.title,
@@ -276,7 +279,8 @@ class DynamoStore:
         if keyword:
             rows = [row for row in rows if keyword.lower() in row["title"].lower()]
         rows.sort(key=lambda row: (row["date"], row["created_at"]), reverse=True)
-        return [self.with_payer_name(row) for row in rows]
+        display_ids = self.ticket_display_ids()
+        return [self.with_payer_name(row, display_ids) for row in rows]
 
     def update_ticket(self, ticket_id: UUID, payload: TicketUpdate, actor_id: UUID) -> tuple[dict[str, Any], dict[str, Any]]:
         row = self.get_ticket(ticket_id)
@@ -310,10 +314,16 @@ class DynamoStore:
             ids.append(row["id"])
         return len(ids), ids
 
-    def with_payer_name(self, ticket: dict[str, Any]) -> dict[str, Any]:
+    def ticket_display_ids(self) -> dict[str, int]:
+        rows = [row for row in self._items("TICKET") if not row.get("deleted_at")]
+        rows.sort(key=lambda row: (row["date"], row["created_at"], row["id"]))
+        return {row["id"]: index + 1 for index, row in enumerate(rows)}
+
+    def with_payer_name(self, ticket: dict[str, Any], display_ids: dict[str, int] | None = None) -> dict[str, Any]:
         row = ticket.copy()
         user = self.get_user(row["payer_user_id"])
         row["payer_name"] = user["name"] if user else None
+        row["display_id"] = (display_ids or self.ticket_display_ids()).get(row["id"], 0)
         return row
 
     @staticmethod

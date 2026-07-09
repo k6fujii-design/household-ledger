@@ -1,26 +1,12 @@
 import { ArrowLeft, CopyCheck, Save, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { ShareBar } from "./ShareBar";
 import type { Category, Ticket, TicketInput, TicketTemplate, User } from "../types";
 import { formatYen, userPair } from "../utils/display";
 
-const presets = [
-  [5, 5],
-  [6, 4],
-  [7, 3],
-  [8, 2],
-  [10, 0],
-  [0, 10]
-];
-
 const amountShortcuts = [100, 500, 1000];
 const today = new Date().toISOString().slice(0, 10);
-
-function normalizeRatio(value: string) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return 0;
-  return Math.max(0, Math.min(10, parsed));
-}
 
 export function TicketForm({
   users,
@@ -68,14 +54,10 @@ export function TicketForm({
     return { f, o: form.amount - f };
   }, [form]);
 
-  function setFirstRatio(value: string) {
-    const ratio = normalizeRatio(value);
+  function setRatio(value: string) {
+    const parsed = Number(value);
+    const ratio = Number.isFinite(parsed) ? Math.max(0, Math.min(10, parsed)) : 5;
     setForm({ ...form, ratio_f: ratio, ratio_o: 10 - ratio });
-  }
-
-  function setSecondRatio(value: string) {
-    const ratio = normalizeRatio(value);
-    setForm({ ...form, ratio_f: 10 - ratio, ratio_o: ratio });
   }
 
   function applyTemplate(templateId: string) {
@@ -140,19 +122,20 @@ export function TicketForm({
         </div>
       )}
       <label>支払者<select value={form.payer_user_id} onChange={(e) => setForm({ ...form, payer_user_id: e.target.value })}>{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>
-      <div>
+      <div className="ratio-slider-field">
         <span className="label">負担比率</span>
-        <div className="preset-row">
-          {presets.map(([f, o]) => (
-            <button type="button" key={`${f}:${o}`} className={form.ratio_f === f && form.ratio_o === o ? "chip on" : "chip"} onClick={() => setForm({ ...form, ratio_f: f, ratio_o: o })}>
-              {f}:{o}
-            </button>
-          ))}
+        <div className="ratio-slider-box">
+          <ShareBar users={users} ratioF={form.ratio_f} ratioO={form.ratio_o} />
+          <input
+            type="range"
+            min={0}
+            max={10}
+            step={1}
+            value={form.ratio_f}
+            onChange={(e) => setRatio(e.target.value)}
+            aria-label="負担比率"
+          />
         </div>
-      </div>
-      <div className="ratio-inputs">
-        <label>{pair.first}<input type="number" min={0} max={10} value={form.ratio_f} onChange={(e) => setFirstRatio(e.target.value)} /></label>
-        <label>{pair.second}<input type="number" min={0} max={10} value={form.ratio_o} onChange={(e) => setSecondRatio(e.target.value)} /></label>
       </div>
       <div className="calc">負担額: {pair.first} {formatYen(shares.f)} / {pair.second} {formatYen(shares.o)}</div>
       <label>ステータス<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as TicketInput["status"] })}><option value="new">未精算</option><option value="settled">精算済み</option><option value="canceled">取り消し</option></select></label>
