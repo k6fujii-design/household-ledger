@@ -1,7 +1,8 @@
-import { CheckCheck, ChevronLeft, ChevronRight, Save } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, Save } from "lucide-react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { api } from "../api/client";
 import { ShareBar } from "../components/ShareBar";
+import { CategoryIcon, categoryForName } from "../components/CategoryIcon";
 import type { AppSettings, Category, MonthlySettlement, Summary, Ticket, User } from "../types";
 import { formatYen } from "../utils/display";
 import { addMonths, currentPeriod, monthLabel } from "../utils/period";
@@ -22,13 +23,13 @@ function CategorySummaryRow({
   row,
   users
 }: {
-  row: { name: string; amount: number; ratioF: number; ratioO: number; shareF: number; shareO: number; count: number; color: string };
+  row: { name: string; amount: number; ratioF: number; ratioO: number; shareF: number; shareO: number; count: number; color: string; category?: Category };
   users: User[];
 }) {
   const normalized = normalizeToTen(row.ratioF, row.ratioO);
   return (
     <article className="category-row">
-      <div><i style={{ background: row.color }} /><strong>{row.name}</strong><span>{row.count}件</span></div>
+      <div><CategoryIcon category={row.category} /><strong>{row.name}</strong><span>{row.count}件</span></div>
       <b>{formatYen(row.amount)}</b>
       <ShareBar users={users} ratioF={normalized.first} ratioO={normalized.second} amountF={row.shareF} amountO={row.shareO} compact percent />
     </article>
@@ -70,11 +71,12 @@ export function SummaryPage({ users, categories, settings }: { users: User[]; ca
   }, [period.from, period.to, category, mode]);
 
   const categoryRows = useMemo(() => {
-    const map = new Map<string, { name: string; amount: number; ratioF: number; ratioO: number; shareF: number; shareO: number; count: number; color: string }>();
+    const map = new Map<string, { name: string; amount: number; ratioF: number; ratioO: number; shareF: number; shareO: number; count: number; color: string; category?: Category }>();
     for (const ticket of tickets) {
-      const name = ticket.category || "未設定";
-      const color = ticket.category ? categories.find((row) => row.name === name)?.color || fallbackColors[map.size % fallbackColors.length] : "#9aa3a8";
-      const current = map.get(name) || { name, amount: 0, ratioF: 0, ratioO: 0, shareF: 0, shareO: 0, count: 0, color };
+      const name = ticket.category || "その他";
+      const categoryRow = categoryForName(categories, name);
+      const color = ticket.category ? categoryRow?.color || fallbackColors[map.size % fallbackColors.length] : "#9aa3a8";
+      const current = map.get(name) || { name, amount: 0, ratioF: 0, ratioO: 0, shareF: 0, shareO: 0, count: 0, color, category: categoryRow };
       current.amount += ticket.amount;
       current.ratioF += ticket.ratio_f;
       current.ratioO += ticket.ratio_o;
@@ -98,6 +100,20 @@ export function SummaryPage({ users, categories, settings }: { users: User[]; ca
     return { background: `conic-gradient(${stops.join(", ")})` };
   }, [categoryRows]);
 
+  const chartIcons = useMemo(() => {
+    const total = categoryRows.reduce((sum, row) => sum + row.amount, 0);
+    if (!total) return [];
+    let cursor = 0;
+    return categoryRows.flatMap((row) => {
+      const share = row.amount / total;
+      const middle = cursor + share / 2;
+      cursor += share;
+      if (share < 0.055) return [];
+      const angle = middle * Math.PI * 2 - Math.PI / 2;
+      return [{ ...row, left: 50 + Math.cos(angle) * 32, top: 50 + Math.sin(angle) * 32 }];
+    }).slice(0, 7);
+  }, [categoryRows]);
+
   const monthlyRows = useMemo(() => {
     const rows = Array.from({ length: 12 }, (_, index) => ({
       month: index + 1,
@@ -113,17 +129,10 @@ export function SummaryPage({ users, categories, settings }: { users: User[]; ca
 
   const totalRatio = summary ? normalizeToTen(summary.share_f, summary.share_o) : null;
 
-  async function bulk() {
-    if (!confirm("対象期間の未精算チケットを精算済みに変更します。\nこの操作を実行しますか？")) return;
-    const result = await api.bulkStatus(period.from, period.to);
-    setMessage(`${result.updated_count}件のチケットを精算済みに変更しました。`);
-    await load();
-  }
-
   async function saveMonthly() {
     if (!monthly) return;
     const saved = await api.updateMonthlySettlement(periodKey, {
-      status: monthly.status === "settled" ? "settled" : "new",
+      status: monthly.status,
       memo: monthly.memo,
       closing_day: settings.closing_day
     });
@@ -157,11 +166,22 @@ export function SummaryPage({ users, categories, settings }: { users: User[]; ca
         {categories.map((row) => <option key={row.id} value={row.name}>{row.name}</option>)}
       </select>
 
-      <section className="summary-visual">
-        <div className="donut" style={pieStyle}><span>{mode === "month" ? monthLabel(baseMonth) : `${baseMonth.getFullYear()}年`}</span></div>
+      <section className="summary-visual summary-visual-premium">
+        <div className="donut-wrap">
+          <div className="donut" style={pieStyle}>
+            <div className="donut-icons">
+              {chartIcons.map((row) => (
+                <span key={row.name} className="donut-icon-position" style={{ "--icon-left": `${row.left}%`, "--icon-top": `${row.top}%` } as CSSProperties}>
+                  <CategoryIcon category={row.category} size={16} />
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
         <div className="summary-total">
-          <span>支出</span>
+          <span>支出合計</span>
           <strong>{formatYen(summary?.total_amount || 0)}</strong>
+          <div className="summary-counts"><small>チケット {summary?.ticket_count || 0}件</small><small>{categoryRows.length}カテゴリ</small></div>
         </div>
       </section>
       {totalRatio && <div className="summary-burden"><ShareBar users={users} ratioF={totalRatio.first} ratioO={totalRatio.second} amountF={summary?.share_f} amountO={summary?.share_o} percent /></div>}
@@ -188,15 +208,10 @@ export function SummaryPage({ users, categories, settings }: { users: User[]; ca
       {monthly && (
         <section className="monthly-panel note-panel">
           <div><strong>{periodKey} 月次メモ</strong><span className="muted">締め日: {settings.closing_day}日</span></div>
-          <select value={monthly.status} onChange={(e) => setMonthly({ ...monthly, status: e.target.value })}>
-            <option value="new">未精算</option>
-            <option value="settled">精算済み</option>
-          </select>
           <textarea value={monthly.memo} onChange={(e) => setMonthly({ ...monthly, memo: e.target.value })} placeholder="自由メモ" />
           <button onClick={saveMonthly}><Save size={18} />保存</button>
         </section>
       )}
-      <button className="wide" onClick={bulk}><CheckCheck size={18} />対象チケットを精算済みにする</button>
       {message && <div className="success">{message}</div>}
     </main>
   );

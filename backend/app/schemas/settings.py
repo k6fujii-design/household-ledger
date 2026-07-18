@@ -10,6 +10,9 @@ class CategoryIn(BaseModel):
 
 class CategoryOut(CategoryIn):
     id: UUID
+    description: str = ""
+    icon: str = "tag"
+    is_default: bool = False
 
     model_config = {"from_attributes": True}
 

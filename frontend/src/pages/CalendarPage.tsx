@@ -1,12 +1,11 @@
 import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
-import type { CalendarDay, CalendarMonthSummary, Category, Ticket, TicketStatus, User } from "../types";
-import { compactYen, formatYen, userPair } from "../utils/display";
+import type { CalendarDay, Category, Ticket, TicketStatus, User } from "../types";
+import { compactYen, formatYen } from "../utils/display";
 import { swipeDirection, type TouchPoint } from "../utils/swipe";
 
 type CalendarFilter = "all" | TicketStatus;
-type CalendarMode = "month" | "year";
 
 const statusParam: Record<CalendarFilter, string> = {
   all: "new,settled,canceled",
@@ -24,40 +23,37 @@ const statusLabel: Record<CalendarFilter, string> = {
 
 const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
 
-export function CalendarPage({ users, categories, openEdit, openCreate }: { users: User[]; categories: Category[]; openEdit: (id: string) => void; openCreate: (date: string) => void }) {
+export function CalendarPage({
+  categories,
+  openEdit,
+  openCreate
+}: {
+  users: User[];
+  categories: Category[];
+  openEdit: (id: string) => void;
+  openCreate: (date: string) => void;
+}) {
   const today = new Date();
-  const [mode, setMode] = useState<CalendarMode>("month");
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
   const [filter, setFilter] = useState<CalendarFilter>("all");
   const [category, setCategory] = useState("");
   const [days, setDays] = useState<CalendarDay[]>([]);
-  const [yearMonths, setYearMonths] = useState<CalendarMonthSummary[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [touchStart, setTouchStart] = useState<TouchPoint | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const pair = userPair(users);
   const dayMap = useMemo(() => Object.fromEntries(days.map((d) => [d.date, d])), [days]);
-  const visibleTotal = useMemo(() => {
-    if (mode === "year") return yearMonths.reduce((sum, item) => sum + item.total_amount, 0);
-    return days.reduce((sum, day) => sum + day.total_amount, 0);
-  }, [days, mode, yearMonths]);
+  const visibleTotal = useMemo(() => days.reduce((sum, day) => sum + day.total_amount, 0), [days]);
 
   async function loadMonth() {
     const res = await api.calendar(year, month, statusParam[filter], category);
     setDays(res.days);
   }
 
-  async function loadYear() {
-    const res = await api.calendarYear(year, statusParam[filter], category);
-    setYearMonths(res.months);
-  }
-
   useEffect(() => {
-    if (mode === "year") loadYear();
-    else loadMonth();
-  }, [year, month, filter, category, mode]);
+    loadMonth();
+  }, [year, month, filter, category]);
 
   async function pick(date: string) {
     setSelected(date);
@@ -83,30 +79,20 @@ export function CalendarPage({ users, categories, openEdit, openCreate }: { user
   }
 
   useEffect(() => {
-    if (selected && mode === "month") pick(selected);
+    if (selected) pick(selected);
   }, [filter, category]);
 
   function move(diff: number) {
-    if (mode === "year") setYear(year + diff);
-    else {
-      const d = new Date(year, month - 1 + diff, 1);
-      setYear(d.getFullYear());
-      setMonth(d.getMonth() + 1);
-    }
+    const d = new Date(year, month - 1 + diff, 1);
+    setYear(d.getFullYear());
+    setMonth(d.getMonth() + 1);
     setSelected(null);
   }
 
   function handleTouchEnd(point: TouchPoint) {
-    if (mode !== "month") return setTouchStart(null);
     const direction = swipeDirection(touchStart, point);
     if (direction) move(direction);
     setTouchStart(null);
-  }
-
-  function openMonth(targetMonth: number) {
-    setMonth(targetMonth);
-    setMode("month");
-    setSelected(null);
   }
 
   const firstWeekday = new Date(year, month - 1, 1).getDay();
@@ -117,14 +103,10 @@ export function CalendarPage({ users, categories, openEdit, openCreate }: { user
 
   return (
     <main className="screen" onTouchStart={(e) => setTouchStart({ x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY })} onTouchEnd={(e) => handleTouchEnd({ x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY })}>
-      <div className="summary-tabs">
-        <button className={mode === "month" ? "on" : ""} onClick={() => setMode("month")}>月次</button>
-        <button className={mode === "year" ? "on" : ""} onClick={() => { setMode("year"); setSelected(null); }}>年次</button>
-      </div>
       <header className="month-head">
-        <button onClick={() => move(-1)} aria-label={mode === "year" ? "前年" : "前月"}><ChevronLeft /></button>
-        <h1>{mode === "year" ? `${year}年` : `${year}年${month}月`}</h1>
-        <button onClick={() => move(1)} aria-label={mode === "year" ? "翌年" : "翌月"}><ChevronRight /></button>
+        <button onClick={() => move(-1)} aria-label="前月"><ChevronLeft /></button>
+        <h1>{year}年{month}月</h1>
+        <button onClick={() => move(1)} aria-label="翌月"><ChevronRight /></button>
       </header>
       <button className="secondary filter-toggle" onClick={() => setShowFilters(!showFilters)}><SlidersHorizontal size={18} />フィルター</button>
       {showFilters && <section className="calendar-filter-panel">
@@ -137,49 +119,33 @@ export function CalendarPage({ users, categories, openEdit, openCreate }: { user
         </select>
       </section>}
       <section className="calendar-summary">
-        <span>{mode === "year" ? "年次表示合計" : "月次表示合計"}</span>
+        <span>月次表示合計</span>
         <strong>{formatYen(visibleTotal)}</strong>
       </section>
 
-      {mode === "year" ? (
-        <div className="year-grid">
-          {yearMonths.map((item) => (
-            <button key={item.month} className="month-card" onClick={() => openMonth(item.month)}>
-              <strong>{item.month}月</strong>
-              <span>{compactYen(item.total_amount)}</span>
-              <small>{item.ticket_count}件</small>
-              <small>{pair.first}: {compactYen(item.paid_by_f)}</small>
-              <small>{pair.second}: {compactYen(item.paid_by_o)}</small>
-            </button>
-          ))}
+      <div className="weekday-grid">{weekdays.map((day, index) => <div key={day} className={index === 0 ? "sun" : index === 6 ? "sat" : ""}>{day}</div>)}</div>
+      <div className="calendar-grid calendar-grid-open">{cells.map((date, index) => {
+        if (!date) return <div key={`blank-${index}`} className="day blank" />;
+        const d = dayMap[date];
+        const weekday = new Date(date).getDay();
+        const weekendClass = weekday === 0 ? " sunday" : weekday === 6 ? " saturday" : "";
+        return (
+          <button key={date} onClick={() => selectDate(date)} className={`${selected === date ? "day selected" : "day"}${weekendClass}`}>
+            <strong>{Number(date.slice(-2))}</strong>
+            {d && <>
+              <span className="day-total">{compactYen(d.total_amount)}</span>
+              <small>{d.ticket_count}件</small>
+            </>}
+          </button>
+        );
+      })}</div>
+      {selected && <>
+        <div className="selected-day-head">
+          <h2>{selected}</h2>
+          <button onClick={() => openCreate(selected)}>この日に作成</button>
         </div>
-      ) : (
-        <>
-          <div className="weekday-grid">{weekdays.map((day, index) => <div key={day} className={index === 0 ? "sun" : index === 6 ? "sat" : ""}>{day}</div>)}</div>
-          <div className="calendar-grid calendar-grid-open">{cells.map((date, index) => {
-            if (!date) return <div key={`blank-${index}`} className="day blank" />;
-            const d = dayMap[date];
-            const weekday = new Date(date).getDay();
-            const weekendClass = weekday === 0 ? " sunday" : weekday === 6 ? " saturday" : "";
-            return (
-              <button key={date} onClick={() => selectDate(date)} className={`${selected === date ? "day selected" : "day"}${weekendClass}`}>
-                <strong>{Number(date.slice(-2))}</strong>
-                {d && <>
-                  <span className="day-total">{compactYen(d.total_amount)}</span>
-                  <small>{d.ticket_count}件</small>
-                </>}
-              </button>
-            );
-          })}</div>
-          {selected && <>
-            <div className="selected-day-head">
-              <h2>{selected}</h2>
-              <button onClick={() => openCreate(selected)}>この日に記録する</button>
-            </div>
-            <div className="list">{tickets.map((t) => <button className="mini-ticket" key={t.id} onClick={() => openEdit(t.id)}>{t.title}<span>{formatYen(t.amount)}</span></button>)}</div>
-          </>}
-        </>
-      )}
+        <div className="list">{tickets.map((t) => <button className="mini-ticket" key={t.id} onClick={() => openEdit(t.id)}>{t.title}<span>{formatYen(t.amount)}</span></button>)}</div>
+      </>}
     </main>
   );
 }

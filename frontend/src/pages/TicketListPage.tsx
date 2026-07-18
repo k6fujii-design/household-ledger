@@ -7,7 +7,7 @@ import type { View } from "../App";
 
 type SortMode = "date" | "amount_desc" | "amount_asc";
 
-export function TicketListPage({ users, categories, setView, openEdit }: { users: User[]; categories: Category[]; setView: (view: View) => void; openEdit: (id: string) => void }) {
+export function TicketListPage({ users, categories, setView, openDetail }: { users: User[]; categories: Category[]; setView: (view: View) => void; openDetail: (id: string) => void }) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [keyword, setKeyword] = useState("");
@@ -64,7 +64,7 @@ export function TicketListPage({ users, categories, setView, openEdit }: { users
         {sort === "amount_asc" && <><ArrowUpNarrowWide size={16} />金額が低い順</>}
         {sort === "date" && "日付が新しい順"}
       </div>
-      <div className="list">{sortedTickets.map((t) => <TicketCard key={t.id} users={users} ticket={t} onClick={() => openEdit(t.id)} />)}</div>
+      <div className="list">{sortedTickets.map((t) => <TicketCard key={t.id} users={users} categories={categories} ticket={t} onClick={() => openDetail(t.id)} />)}</div>
     </main>
   );
 }

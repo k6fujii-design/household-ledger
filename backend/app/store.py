@@ -15,6 +15,21 @@ from app.core.secrets import initial_user_password
 from app.schemas.ticket import TicketCreate, TicketUpdate
 
 
+DEFAULT_CATEGORIES = [
+    ("食費", "スーパー、コンビニ、食材、飲料など", "utensils", "#f9736b"),
+    ("外食", "レストラン、カフェ、デリバリーなど", "restaurant", "#fb923c"),
+    ("日用品", "洗剤、ティッシュ、生活雑貨など", "shopping-basket", "#eab308"),
+    ("住居", "家賃、管理費、更新料、家具など", "house", "#8b5cf6"),
+    ("水道・光熱費", "電気、ガス、水道など", "zap", "#06b6d4"),
+    ("通信費", "スマホ、インターネット、郵送料など", "smartphone", "#3b82f6"),
+    ("交通費", "電車、バス、タクシー、ガソリンなど", "train", "#14b8a6"),
+    ("医療・健康", "病院、薬、健康診断、ジムなど", "heart-pulse", "#ef476f"),
+    ("衣服・美容", "服、靴、美容院、化粧品など", "sparkles", "#ec4899"),
+    ("娯楽・趣味", "ゲーム、映画、旅行、サブスクなど", "gamepad", "#6366f1"),
+    ("その他", "上記に分類しにくい支出", "shapes", "#64748b"),
+]
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -158,8 +173,23 @@ class DynamoStore:
     def list_categories(self) -> list[dict[str, Any]]:
         return sorted(self._items("CATEGORY"), key=lambda row: row["name"])
 
+    def seed_categories(self) -> None:
+        existing_by_name = {row["name"]: row for row in self._items("CATEGORY")}
+        for name, description, icon, color in DEFAULT_CATEGORIES:
+            existing = existing_by_name.get(name)
+            category_id = existing["id"] if existing else str(uuid4())
+            self._put("CATEGORY", category_id, {
+                **(existing or {}),
+                "id": category_id,
+                "name": name,
+                "description": description,
+                "icon": icon,
+                "color": existing.get("color", color) if existing else color,
+                "is_default": True,
+            })
+
     def create_category(self, name: str, color: str) -> dict[str, Any]:
-        row = {"id": str(uuid4()), "name": name.strip(), "color": color}
+        row = {"id": str(uuid4()), "name": name.strip(), "color": color, "description": "", "icon": "tag", "is_default": False}
         return self._put("CATEGORY", row["id"], row)
 
     def update_category(self, category_id: UUID, name: str, color: str) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -233,7 +263,7 @@ class DynamoStore:
             "share_f": share_f,
             "share_o": share_o,
             "status": payload.status,
-            "category": payload.category.strip(),
+            "category": payload.category.strip() or "その他",
             "memo": payload.memo,
             "updated_by": str(actor_id),
             "updated_at": timestamp,
@@ -273,7 +303,7 @@ class DynamoStore:
         else:
             rows = [row for row in rows if row["status"] != "canceled"]
         if category:
-            rows = [row for row in rows if row.get("category") == category]
+            rows = [row for row in rows if (row.get("category") or "その他") == category]
         if payer_user_id:
             rows = [row for row in rows if row["payer_user_id"] == str(payer_user_id)]
         if keyword:
@@ -321,6 +351,7 @@ class DynamoStore:
 
     def with_payer_name(self, ticket: dict[str, Any], display_ids: dict[str, int] | None = None) -> dict[str, Any]:
         row = ticket.copy()
+        row["category"] = row.get("category") or "その他"
         user = self.get_user(row["payer_user_id"])
         row["payer_name"] = user["name"] if user else None
         row["display_id"] = (display_ids or self.ticket_display_ids()).get(row["id"], 0)

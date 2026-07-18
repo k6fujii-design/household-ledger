@@ -30,6 +30,7 @@ app.include_router(audit.router)
 def startup() -> None:
     store.ensure_table()
     store.seed_users()
+    store.seed_categories()
 
 
 @app.get("/health")

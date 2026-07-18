@@ -2,6 +2,7 @@ import { ArrowLeft, ChevronRight, ExternalLink, Github, History, LogOut, Palette
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { AppSettings, AuditLog, Category, TicketTemplate, TicketTemplateInput, User } from "../types";
+import { CategoryIcon } from "../components/CategoryIcon";
 
 type SettingsSection = "menu" | "names" | "closing" | "categories" | "templates" | "history" | "about";
 
@@ -13,7 +14,7 @@ const emptyTemplate: TicketTemplateInput = {
   ratio_f: 5,
   ratio_o: 5,
   status: "new",
-  category: "",
+  category: "その他",
   memo: ""
 };
 
@@ -188,8 +189,8 @@ export function SettingsPage({
           <input type="color" value={categoryColor} onChange={(e) => setCategoryColor(e.target.value)} aria-label="カテゴリ色" />
           <button onClick={addCategory}><Plus size={18} />追加</button>
         </div>
-        <div className="editable-list">{categories.map((row) => (
-          <div key={row.id}><span><i className="color-dot" style={{ background: row.color }} />{row.name}</span><button className="danger icon-button" onClick={() => removeCategory(row.id)}><Trash2 size={16} /></button></div>
+        <div className="editable-list category-settings-list">{categories.map((row) => (
+          <div key={row.id}><CategoryIcon category={row} size={20} /><span><strong>{row.name}</strong>{row.description && <small>{row.description}</small>}</span><button className="danger icon-button" onClick={() => removeCategory(row.id)}><Trash2 size={16} /></button></div>
         ))}</div>
       </section>}
 
@@ -198,7 +199,7 @@ export function SettingsPage({
         <label>概要<input value={template.title} onChange={(e) => setTemplate({ ...template, title: e.target.value })} /></label>
         <label>金額<input type="number" min={1} value={template.amount} onChange={(e) => setTemplate({ ...template, amount: Number(e.target.value) })} /></label>
         <label>支払者<select value={template.payer_user_id || ""} onChange={(e) => setTemplate({ ...template, payer_user_id: e.target.value || null })}><option value="">作成時に選ぶ</option>{users.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
-        <label>カテゴリ<select value={template.category} onChange={(e) => setTemplate({ ...template, category: e.target.value })}><option value="">未設定</option>{categoryOptions.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
+        <label>カテゴリ<select value={template.category} onChange={(e) => setTemplate({ ...template, category: e.target.value })}>{categoryOptions.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
         <div className="ratio-inputs"><label>比率1<input type="number" min={0} value={template.ratio_f} onChange={(e) => setTemplate({ ...template, ratio_f: Number(e.target.value), ratio_o: 10 - Number(e.target.value) })} /></label><label>比率2<input type="number" min={0} value={template.ratio_o} onChange={(e) => setTemplate({ ...template, ratio_f: 10 - Number(e.target.value), ratio_o: Number(e.target.value) })} /></label></div>
         <label>メモ<textarea value={template.memo} onChange={(e) => setTemplate({ ...template, memo: e.target.value })} /></label>
         <button onClick={addTemplate}><Plus size={18} />テンプレート追加</button>

@@ -23,6 +23,7 @@ export function TicketCreatePage({
     onDone();
     setView("home");
   }
+
   return (
     <main className="screen record-screen">
       <header className="record-head">

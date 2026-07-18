@@ -7,14 +7,32 @@ import { HomePage } from "./pages/HomePage";
 import { TicketListPage } from "./pages/TicketListPage";
 import { TicketCreatePage } from "./pages/TicketCreatePage";
 import { TicketEditPage } from "./pages/TicketEditPage";
+import { TicketDetailPage } from "./pages/TicketDetailPage";
 import { SummaryPage } from "./pages/SummaryPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
-export type View = "home" | "tickets" | "create" | "edit" | "summary" | "calendar" | "history" | "settings";
+export type View = "home" | "tickets" | "create" | "detail" | "edit" | "summary" | "calendar" | "history" | "settings";
+
+type AppHistoryState = {
+  view: View;
+  editId?: string | null;
+};
 
 const defaultSettings: AppSettings = { closing_day: 31 };
+const views: View[] = ["home", "tickets", "create", "detail", "edit", "summary", "calendar", "history", "settings"];
+
+function viewFromHash(): View {
+  const hash = window.location.hash.replace("#", "");
+  const viewName = hash.startsWith("edit-") ? "edit" : hash.startsWith("detail-") ? "detail" : hash;
+  return views.includes(viewName as View) ? viewName as View : "home";
+}
+
+function editIdFromHash() {
+  const hash = window.location.hash.replace("#", "");
+  return hash.startsWith("edit-") ? hash.slice(5) : hash.startsWith("detail-") ? hash.slice(7) : null;
+}
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -22,10 +40,25 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [categories, setCategories] = useState<Category[]>([]);
   const [templates, setTemplates] = useState<TicketTemplate[]>([]);
-  const [view, setView] = useState<View>("home");
-  const [editId, setEditId] = useState<string | null>(null);
+  const [view, setViewState] = useState<View>(() => viewFromHash());
+  const [editId, setEditId] = useState<string | null>(() => editIdFromHash());
   const [cloneDraft, setCloneDraft] = useState<TicketInput | null>(null);
   const [loading, setLoading] = useState(true);
+
+  function navigate(nextView: View, options: { replace?: boolean; editId?: string | null } = {}) {
+    const hasTicket = nextView === "edit" || nextView === "detail";
+    const nextEditId = hasTicket ? options.editId || editId : null;
+    const url = hasTicket && nextEditId ? `#${nextView}-${nextEditId}` : `#${nextView}`;
+    const state: AppHistoryState = { view: nextView, editId: nextEditId };
+    if (options.replace) {
+      window.history.replaceState(state, "", url);
+    } else {
+      window.history.pushState(state, "", url);
+    }
+    setViewState(nextView);
+    setEditId(nextEditId);
+    if (nextView !== "create") setCloneDraft(null);
+  }
 
   async function loadShared() {
     const [userRows, appSettings, categoryRows, templateRows] = await Promise.all([
@@ -54,6 +87,22 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (!window.history.state?.view) {
+      window.history.replaceState({ view, editId }, "", (view === "edit" || view === "detail") && editId ? `#${view}-${editId}` : `#${view}`);
+    }
+    const handlePopState = (event: PopStateEvent) => {
+      const state = event.state as AppHistoryState | null;
+      const nextView = state?.view || viewFromHash();
+      const nextEditId = nextView === "edit" || nextView === "detail" ? state?.editId || editIdFromHash() : null;
+      setViewState(nextView);
+      setEditId(nextEditId);
+      if (nextView !== "create") setCloneDraft(null);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
     loadSession();
   }, []);
 
@@ -61,8 +110,11 @@ export default function App() {
   if (!user) return <LoginPage onLogin={loadSession} />;
 
   const openEdit = (id: string) => {
-    setEditId(id);
-    setView("edit");
+    navigate("edit", { editId: id });
+  };
+
+  const openDetail = (id: string) => {
+    navigate("detail", { editId: id });
   };
 
   const cloneTicket = async (id: string) => {
@@ -78,35 +130,36 @@ export default function App() {
       category: ticket.category,
       memo: ticket.memo
     });
-    setView("create");
+    navigate("create");
   };
 
   const createTicketOnDate = (date: string) => {
     setCloneDraft({
       date,
       title: "",
-      amount: 1000,
+      amount: 0,
       payer_user_id: users[0]?.id || "",
       ratio_f: 5,
       ratio_o: 5,
       status: "new",
-      category: "",
+      category: "その他",
       memo: ""
     });
-    setView("create");
+    navigate("create");
   };
 
   return (
     <div className="app-shell">
-      {view === "home" && <HomePage users={users} categories={categories} settings={settings} setView={setView} openEdit={openEdit} />}
-      {view === "tickets" && <TicketListPage users={users} categories={categories} setView={setView} openEdit={openEdit} />}
-      {view === "create" && <TicketCreatePage users={users} categories={categories} templates={templates} draft={cloneDraft} setView={setView} onDone={() => setCloneDraft(null)} />}
-      {view === "edit" && editId && <TicketEditPage id={editId} users={users} categories={categories} templates={templates} setView={setView} onClone={cloneTicket} />}
+      {view === "home" && <HomePage users={users} categories={categories} settings={settings} setView={navigate} openDetail={openDetail} />}
+      {view === "tickets" && <TicketListPage users={users} categories={categories} setView={navigate} openDetail={openDetail} />}
+      {view === "create" && <TicketCreatePage users={users} categories={categories} templates={templates} draft={cloneDraft} setView={navigate} onDone={() => setCloneDraft(null)} />}
+      {view === "detail" && editId && <TicketDetailPage id={editId} users={users} categories={categories} onBack={() => navigate("tickets")} onEdit={openEdit} />}
+      {view === "edit" && editId && <TicketEditPage id={editId} users={users} categories={categories} templates={templates} setView={navigate} onClone={cloneTicket} />}
       {view === "summary" && <SummaryPage users={users} categories={categories} settings={settings} />}
       {view === "calendar" && <CalendarPage users={users} categories={categories} openEdit={openEdit} openCreate={createTicketOnDate} />}
       {view === "history" && <HistoryPage openEdit={openEdit} />}
-      {view === "settings" && <SettingsPage user={user} users={users} categories={categories} templates={templates} settings={settings} onSharedChange={loadShared} openEdit={openEdit} onLogout={() => { setUser(null); setView("home"); }} />}
-      <BottomNav view={view} setView={setView} />
+      {view === "settings" && <SettingsPage user={user} users={users} categories={categories} templates={templates} settings={settings} onSharedChange={loadShared} openEdit={openEdit} onLogout={() => { setUser(null); navigate("home", { replace: true }); }} />}
+      <BottomNav view={view} setView={navigate} />
     </div>
   );
 }

@@ -4,9 +4,19 @@ import { useEffect, useMemo, useState } from "react";
 import { ShareBar } from "./ShareBar";
 import type { Category, Ticket, TicketInput, TicketTemplate, User } from "../types";
 import { formatYen, userPair } from "../utils/display";
+import { CategoryIcon } from "./CategoryIcon";
 
-const amountShortcuts = [100, 500, 1000];
+const amountShortcuts = [100, 1000, 10000];
 const today = new Date().toISOString().slice(0, 10);
+
+function RequiredLabel({ children }: { children: string }) {
+  return (
+    <span className="field-label">
+      {children}
+      <span className="required-mark" aria-label="必須">*</span>
+    </span>
+  );
+}
 
 export function TicketForm({
   users,
@@ -34,12 +44,12 @@ export function TicketForm({
   const [form, setForm] = useState<TicketInput>({
     date: ticket?.date || draft?.date || today,
     title: ticket?.title || draft?.title || "",
-    amount: ticket?.amount || draft?.amount || 1000,
+    amount: ticket?.amount ?? draft?.amount ?? 0,
     payer_user_id: initialPayer,
     ratio_f: ticket?.ratio_f ?? draft?.ratio_f ?? 5,
     ratio_o: ticket?.ratio_o ?? draft?.ratio_o ?? 5,
     status: ticket?.status || draft?.status || "new",
-    category: ticket?.category || draft?.category || "",
+    category: ticket?.category || draft?.category || "その他",
     memo: ticket?.memo || draft?.memo || ""
   });
   const [error, setError] = useState("");
@@ -49,15 +59,20 @@ export function TicketForm({
   }, [draft, ticket]);
 
   const shares = useMemo(() => {
+    const amount = Number(form.amount) || 0;
     const total = form.ratio_f + form.ratio_o;
-    const f = total ? Math.round(form.amount * form.ratio_f / total) : 0;
-    return { f, o: form.amount - f };
+    const f = total ? Math.round(amount * form.ratio_f / total) : 0;
+    return { f, o: amount - f };
   }, [form]);
 
   function setRatio(value: string) {
     const parsed = Number(value);
     const ratio = Number.isFinite(parsed) ? Math.max(0, Math.min(10, parsed)) : 5;
     setForm({ ...form, ratio_f: ratio, ratio_o: 10 - ratio });
+  }
+
+  function adjustAmount(diff: number) {
+    setForm({ ...form, amount: Math.max(0, (Number(form.amount) || 0) + diff) });
   }
 
   function applyTemplate(templateId: string) {
@@ -71,7 +86,7 @@ export function TicketForm({
       ratio_f: template.ratio_f,
       ratio_o: template.ratio_o,
       status: template.status,
-      category: template.category,
+      category: template.category || "その他",
       memo: template.memo
     });
   }
@@ -79,11 +94,13 @@ export function TicketForm({
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");
-    if (!form.title.trim()) return setError("概要を入力してください");
+    if (!form.date) return setError("日付を入力してください");
     if (form.amount < 1) return setError("金額は1円以上で入力してください");
+    if (!form.payer_user_id) return setError("支払者を選択してください");
+    if (!form.status) return setError("ステータスを選択してください");
     if (form.ratio_f + form.ratio_o === 0) return setError("負担比率を入力してください");
     try {
-      await onSubmit(form);
+      await onSubmit({ ...form, title: form.title.trim() || "無題" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存に失敗しました");
     }
@@ -93,35 +110,55 @@ export function TicketForm({
     <form className="form" onSubmit={submit}>
       {error && <div className="error">{error}</div>}
       {templates.length > 0 && (
-        <label>テンプレート
+        <label>
+          <span className="field-label">テンプレート</span>
           <select defaultValue="" onChange={(e) => applyTemplate(e.target.value)}>
             <option value="">選択してください</option>
             {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
           </select>
         </label>
       )}
-      <label>日付<input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label>
-      <label>概要<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="食費、日用品、交通費など" /></label>
-      <label>金額<input type="number" min={1} value={form.amount} onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })} /></label>
-      <div className="preset-row amount-shortcuts">
-        {amountShortcuts.map((amount) => <button type="button" className="chip" key={amount} onClick={() => setForm({ ...form, amount: form.amount + amount })}>+{amount}</button>)}
+      <label>
+        <RequiredLabel>日付</RequiredLabel>
+        <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+      </label>
+      <label>
+        <span className="field-label">概要</span>
+        <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="食費、日用品、交通費など" />
+      </label>
+      <label>
+        <RequiredLabel>金額</RequiredLabel>
+        <input type="number" min={1} value={form.amount || ""} onChange={(e) => setForm({ ...form, amount: Number(e.target.value || 0) })} placeholder="0" />
+      </label>
+      <div className="amount-stepper">
+        {amountShortcuts.map((amount) => (
+          <button key={`plus-${amount}`} type="button" className="chip amount-plus" onClick={() => adjustAmount(amount)}>+{amount.toLocaleString()}</button>
+        ))}
+        {amountShortcuts.map((amount) => (
+          <button key={`minus-${amount}`} type="button" className="chip amount-minus" onClick={() => adjustAmount(-amount)}>-{amount.toLocaleString()}</button>
+        ))}
       </div>
-      <label>カテゴリ
+      <label>
+        <span className="field-label">カテゴリ</span>
         <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-          <option value="">未設定</option>
           {categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
         </select>
       </label>
       {categories.length > 0 && (
-        <div className="preset-row">
+        <div className="preset-row category-preset-grid">
           {categories.map((category) => (
             <button type="button" key={category.id} className={form.category === category.name ? "chip on" : "chip"} onClick={() => setForm({ ...form, category: category.name })}>
-              <span className="color-dot" style={{ background: category.color }} />{category.name}
+              <CategoryIcon category={category} size={14} />{category.name}
             </button>
           ))}
         </div>
       )}
-      <label>支払者<select value={form.payer_user_id} onChange={(e) => setForm({ ...form, payer_user_id: e.target.value })}>{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>
+      <label>
+        <RequiredLabel>支払者</RequiredLabel>
+        <select value={form.payer_user_id} onChange={(e) => setForm({ ...form, payer_user_id: e.target.value })}>
+          {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+        </select>
+      </label>
       <div className="ratio-slider-field">
         <span className="label">負担比率</span>
         <div className="ratio-slider-box">
@@ -138,8 +175,18 @@ export function TicketForm({
         </div>
       </div>
       <div className="calc">負担額: {pair.first} {formatYen(shares.f)} / {pair.second} {formatYen(shares.o)}</div>
-      <label>ステータス<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as TicketInput["status"] })}><option value="new">未精算</option><option value="settled">精算済み</option><option value="canceled">取り消し</option></select></label>
-      <label>メモ<textarea value={form.memo} onChange={(e) => setForm({ ...form, memo: e.target.value })} /></label>
+      <label>
+        <RequiredLabel>ステータス</RequiredLabel>
+        <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as TicketInput["status"] })}>
+          <option value="new">未精算</option>
+          <option value="settled">精算済み</option>
+          <option value="canceled">取り消し</option>
+        </select>
+      </label>
+      <label>
+        <span className="field-label">メモ</span>
+        <textarea value={form.memo} onChange={(e) => setForm({ ...form, memo: e.target.value })} />
+      </label>
       <div className="actions">
         {onCancel && <button type="button" className="secondary" onClick={onCancel}><ArrowLeft size={18} />戻る</button>}
         {onClone && <button type="button" className="secondary" onClick={onClone}><CopyCheck size={18} />コピー</button>}

@@ -1,9 +1,10 @@
 import { ChevronRight } from "lucide-react";
-import type { Ticket, User } from "../types";
+import type { Category, Ticket, User } from "../types";
 import { formatYen, userPair } from "../utils/display";
 import { StatusBadge } from "./StatusBadge";
+import { CategoryIcon, categoryForName } from "./CategoryIcon";
 
-export function TicketCard({ ticket, users, onClick }: { ticket: Ticket; users: User[]; onClick: () => void }) {
+export function TicketCard({ ticket, users, categories, onClick }: { ticket: Ticket; users: User[]; categories: Category[]; onClick: () => void }) {
   const pair = userPair(users);
 
   return (
@@ -15,7 +16,7 @@ export function TicketCard({ ticket, users, onClick }: { ticket: Ticket; users: 
         </div>
         <div className="ticket-id">チケットID: {ticket.display_id || "-"}</div>
         <div className="muted">{ticket.date} / 支払: {ticket.payer_name}</div>
-        <div className={ticket.category ? "category-pill" : "category-pill unspecified"}>{ticket.category || "未指定"}</div>
+        <div className="category-pill"><CategoryIcon category={categoryForName(categories, ticket.category || "その他")} size={14} />{ticket.category || "その他"}</div>
         <div className="split">
           <span>{pair.first} {formatYen(ticket.share_f)}</span>
           <span>{pair.second} {formatYen(ticket.share_o)}</span>

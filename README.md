@@ -8,25 +8,40 @@
   <table>
     <tr>
       <td align="center" valign="top">
-        <img src="docs/screens/ss_home.png" alt="ホーム画面" width="160"><br>
-        <sub>ホーム</sub>
+        <img src="docs/screens/ss-home.jpg" alt="ホーム画面　精算状況" width="180"><br>
+        <sub>ホーム（精算状況）</sub>
       </td>
       <td align="center" valign="top">
-        <img src="docs/screens/ss_summary_month.png" alt="集計画面 月次" width="160"><br>
+        <img src="docs/screens/ss-home2.jpg" alt="ホーム画面　チケット一覧" width="180"><br>
+        <sub>ホーム（チケット明細）</sub>
+      </td>
+      <td align="center" valign="top">
+        <img src="docs/screens/ss-ticket.jpg" alt="チケット参照画面" width="180"><br>
+        <sub>チケット参照</sub>
+      </td>
+      <td align="center" valign="top">
+        <img src="docs/screens/ss-calender.png" alt="カレンダー画面" width="180"><br>
+        <sub>カレンダー</sub>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" valign="top">
+        <img src="docs/screens/ss-summary.jpg" alt="集計画面　月次" width="180"><br>
         <sub>集計（月次）</sub>
       </td>
       <td align="center" valign="top">
-        <img src="docs/screens/ss_summary_year.png" alt="集計画面 年次" width="160"><br>
+        <img src="docs/screens/ss-summary2.jpg" alt="集計画面　年次" width="180"><br>
         <sub>集計（年次）</sub>
       </td>
       <td align="center" valign="top">
-        <img src="docs/screens/ss_record.png" alt="記録画面" width="160"><br>
-        <sub>記録</sub>
+        <img src="docs/screens/ss-summary3.png" alt="集計画面　年次内訳" width="180"><br>
+        <sub>集計（年次）</sub>
       </td>
       <td align="center" valign="top">
-        <img src="docs/screens/ss_calendar.png" alt="カレンダー画面" width="160"><br>
-        <sub>カレンダー</sub>
+        <img src="docs/screens/ss-caterogy.png" alt="カテゴリ設定画面" width="180"><br>
+        <sub>カテゴリ設定</sub>
       </td>
+      <td></td>
     </tr>
   </table>
 </div>
@@ -40,13 +55,13 @@ Household Ledgerは、支払い・負担割合・精算額をチケット単位�
 ## 主な機能
 
 - 2ユーザー用ログイン
-- チケットの作成、編集、複製、削除
+- チケットの作成、参照、編集、複製、削除
 - 未精算、精算済み、取り消しのステータス管理
 - 支払者と負担比率による自動精算計算
-- カテゴリ管理
+- アイコン付き標準カテゴリ、ユーザーカテゴリ管理
 - テンプレート管理
 - 月次、年次カレンダー集計
-- 月次精算メモ
+- 月次メモ
 - 締め日設定
 - 操作履歴
 - スマートフォン向けUI
