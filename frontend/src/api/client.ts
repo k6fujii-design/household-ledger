@@ -30,8 +30,8 @@ export const api = {
   logout: () => request<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),
   me: () => request<{ user: User }>("/api/auth/me"),
   users: () => request<User[]>("/api/users"),
-  updateUser: (id: string, name: string) =>
-    request<User>(`/api/users/${id}`, { method: "PUT", headers: jsonHeaders, body: JSON.stringify({ name }) }),
+  updateUser: (id: string, name: string, lineUserId?: string | null) =>
+    request<User>(`/api/users/${id}`, { method: "PUT", headers: jsonHeaders, body: JSON.stringify({ name, line_user_id: lineUserId || null }) }),
   tickets: (params = "") => request<Ticket[]>(`/api/tickets${params}`),
   ticket: (id: string) => request<Ticket>(`/api/tickets/${id}`),
   createTicket: (payload: TicketInput) => request<Ticket>("/api/tickets", { method: "POST", headers: jsonHeaders, body: JSON.stringify(payload) }),

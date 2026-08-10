@@ -497,6 +497,39 @@ textarea { min-height: 86px; resize: vertical; }
   color: #687277;
   font-size: 12px;
 }
+.history-ai {
+  border-color: rgba(86, 159, 135, .28);
+  background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(242, 250, 245, .95));
+}
+.history-ai-head {
+  display: flex !important;
+  align-items: center;
+  gap: 10px !important;
+}
+.history-ai-icon {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #e7f5ee;
+  color: #4e8f73;
+  flex: 0 0 auto;
+}
+.history-ai-trace {
+  margin: 2px 0;
+  padding-left: 20px;
+  color: #56645d;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.history-ai small {
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f2f5f3;
+  color: #66736c;
+}
 .inline-fields {
   display: grid;
   grid-template-columns: 1fr 56px auto;
@@ -815,7 +848,7 @@ textarea { min-height: 86px; resize: vertical; }
   width: 160px;
   height: 160px;
   border-radius: 50%;
-  border: 2px solid #172126;
+  border: 0;
   display: grid;
   place-items: center;
   position: relative;
@@ -826,7 +859,7 @@ textarea { min-height: 86px; resize: vertical; }
   width: 76px;
   height: 76px;
   border-radius: 50%;
-  border: 2px solid #172126;
+  border: 0;
   background: #fff;
 }
 .donut span {
@@ -1400,6 +1433,19 @@ textarea { min-height: 86px; resize: vertical; }
 .tech-details.page-panel .external-link-button {
   width: 100%;
   margin-top: 4px;
+}
+.user-profile-fields {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #fff8ee;
+  border: 1px solid rgba(255, 170, 126, .34);
+}
+.user-profile-fields > strong {
+  color: #7a858b;
+  font-size: 12px;
+  word-break: break-all;
 }
 .ticket-list-link {
   width: 100%;

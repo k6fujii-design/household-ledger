@@ -132,7 +132,8 @@ class DynamoStore:
             (settings.initial_user_2_name, "o@example.com"),
         ]:
             user = self.get_user_by_email(email)
-            item = user or {"id": str(uuid4()), "email": email, "name": name}
+            item = user or {"id": str(uuid4()), "email": email, "name": name, "line_user_id": None}
+            item.setdefault("line_user_id", None)
             item["password_hash"] = hash_password(password)
             self._put("USER", item["id"], item)
 
@@ -145,18 +146,22 @@ class DynamoStore:
     def get_user_by_email(self, email: str) -> dict[str, Any] | None:
         return next((row for row in self._items("USER") if row["email"] == email), None)
 
+    def get_user_by_line_user_id(self, line_user_id: str) -> dict[str, Any] | None:
+        return next((row for row in self._items("USER") if row.get("line_user_id") == line_user_id), None)
+
     def authenticate(self, email: str, password: str) -> dict[str, Any] | None:
         user = self.get_user_by_email(email)
         if not user or not verify_password(password, user["password_hash"]):
             return None
         return user
 
-    def update_user_name(self, user_id: UUID, name: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    def update_user_profile(self, user_id: UUID, name: str, line_user_id: str | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
         user = self.get_user(user_id)
         if not user:
             raise KeyError("user")
-        before = {"name": user["name"]}
+        before = {"name": user["name"], "line_user_id": user.get("line_user_id")}
         user["name"] = name[:40]
+        user["line_user_id"] = line_user_id[:80] if line_user_id else None
         self._put("USER", user["id"], user)
         return before, user
 

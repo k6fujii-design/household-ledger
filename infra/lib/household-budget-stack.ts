@@ -36,6 +36,20 @@ export class HouseholdBudgetStack extends Stack {
       resource: "parameter",
       resourceName: initialUserPasswordParameterName.replace(/^\//, "")
     });
+    const lineChannelSecretParameterName = this.node.tryGetContext("lineChannelSecretParameterName") || "/household-ledger/line/channel-secret";
+    const lineChannelAccessTokenParameterName = this.node.tryGetContext("lineChannelAccessTokenParameterName") || "/household-ledger/line/channel-access-token";
+    const lineChannelSecretParameterArn = Stack.of(this).formatArn({
+      service: "ssm",
+      resource: "parameter",
+      resourceName: lineChannelSecretParameterName.replace(/^\//, "")
+    });
+    const lineChannelAccessTokenParameterArn = Stack.of(this).formatArn({
+      service: "ssm",
+      resource: "parameter",
+      resourceName: lineChannelAccessTokenParameterName.replace(/^\//, "")
+    });
+    const lineAgentMode = this.node.tryGetContext("lineAgentMode") || "rules";
+    const bedrockModelId = this.node.tryGetContext("bedrockModelId") || "amazon.nova-lite-v1:0";
 
     const backend = new lambda.DockerImageFunction(this, "BackendFunction", {
       code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, "../../backend"), {
@@ -51,13 +65,34 @@ export class HouseholdBudgetStack extends Stack {
         SESSION_SECRET: this.node.tryGetContext("sessionSecret") || "change-me-after-deploy",
         INITIAL_USER_PASSWORD_PARAMETER_NAME: initialUserPasswordParameterName,
         INITIAL_USER_1_NAME: this.node.tryGetContext("initialUser1Name") || "User 1",
-        INITIAL_USER_2_NAME: this.node.tryGetContext("initialUser2Name") || "User 2"
+        INITIAL_USER_2_NAME: this.node.tryGetContext("initialUser2Name") || "User 2",
+        LINE_CHANNEL_SECRET_PARAMETER_NAME: lineChannelSecretParameterName,
+        LINE_CHANNEL_ACCESS_TOKEN_PARAMETER_NAME: lineChannelAccessTokenParameterName,
+        LINE_AGENT_MODE: lineAgentMode,
+        LINE_AGENT_TRACE_ENABLED: this.node.tryGetContext("lineAgentTraceEnabled") || "true",
+        BEDROCK_MODEL_ID: bedrockModelId
       }
     });
     table.grantReadWriteData(backend);
     backend.addToRolePolicy(new iam.PolicyStatement({
       actions: ["ssm:GetParameter"],
-      resources: [initialUserPasswordParameterArn]
+      resources: [
+        initialUserPasswordParameterArn,
+        lineChannelSecretParameterArn,
+        lineChannelAccessTokenParameterArn
+      ]
+    }));
+    backend.addToRolePolicy(new iam.PolicyStatement({
+      actions: ["bedrock:InvokeModel"],
+      resources: [
+        Stack.of(this).formatArn({
+          service: "bedrock",
+          resource: "foundation-model",
+          resourceName: bedrockModelId,
+          account: "",
+          region: Stack.of(this).region
+        })
+      ]
     }));
 
     const httpApi = new apigwv2.HttpApi(this, "HttpApi", {
@@ -117,6 +152,10 @@ export class HouseholdBudgetStack extends Stack {
 
     new CfnOutput(this, "InitialUserPasswordParameterName", {
       value: initialUserPasswordParameterName
+    });
+
+    new CfnOutput(this, "LineWebhookUrl", {
+      value: `${httpApi.apiEndpoint}/line/webhook`
     });
   }
 }

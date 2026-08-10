@@ -27,6 +27,7 @@ const actionLabels: Record<string, string> = {
   ticket_status_change: "ステータス変更",
   ticket_bulk_status_update: "一括精算",
   setting_update_user_name: "表示名変更",
+  setting_update_user_profile: "ユーザー設定変更",
   setting_update_closing_day: "締め日変更",
   setting_create_category: "カテゴリ追加",
   setting_update_category: "カテゴリ編集",
@@ -70,6 +71,7 @@ export function SettingsPage({
 }) {
   const [section, setSection] = useState<SettingsSection>("menu");
   const [names, setNames] = useState<Record<string, string>>({});
+  const [lineUserIds, setLineUserIds] = useState<Record<string, string>>({});
   const [closingDay, setClosingDay] = useState(settings.closing_day);
   const [categoryName, setCategoryName] = useState("");
   const [categoryColor, setCategoryColor] = useState("#ff8f70");
@@ -80,6 +82,7 @@ export function SettingsPage({
 
   useEffect(() => {
     setNames(Object.fromEntries(users.map((u) => [u.id, u.name])));
+    setLineUserIds(Object.fromEntries(users.map((u) => [u.id, u.line_user_id || ""])));
     setClosingDay(settings.closing_day);
   }, [users, settings]);
 
@@ -91,10 +94,11 @@ export function SettingsPage({
     setMessage("");
     for (const row of users) {
       const name = names[row.id]?.trim();
-      if (name && name !== row.name) await api.updateUser(row.id, name);
+      const lineUserId = lineUserIds[row.id]?.trim() || null;
+      if (name && (name !== row.name || lineUserId !== (row.line_user_id || null))) await api.updateUser(row.id, name, lineUserId);
     }
     await onSharedChange();
-    setMessage("表示名を保存しました。");
+    setMessage("ユーザー設定を保存しました。");
   }
 
   async function saveClosingDay() {
@@ -142,7 +146,7 @@ export function SettingsPage({
     <main className="screen settings-screen">
       <header className="settings-title">
         <h1>{section === "menu" ? "設定" : {
-          names: "表示名",
+          names: "ユーザー設定",
           closing: "締め日",
           categories: "カテゴリ",
           templates: "チケットテンプレート",
@@ -156,7 +160,7 @@ export function SettingsPage({
         <section className="settings-menu">
           <article className="login-card"><span>ログイン中</span><strong>{user.name}</strong><small>{user.email}</small></article>
           {[
-            { key: "names", label: "表示名", Icon: UserRound },
+            { key: "names", label: "ユーザー設定", Icon: UserRound },
             { key: "closing", label: "締め日", Icon: CalendarClock },
             { key: "categories", label: "カテゴリ", Icon: Palette },
             { key: "templates", label: "チケットテンプレート", Icon: ReceiptText },
@@ -174,8 +178,14 @@ export function SettingsPage({
       )}
 
       {section === "names" && <section className="settings-panel page-panel">
-        {users.map((row) => <label key={row.id}>{row.email}<input value={names[row.id] || ""} onChange={(e) => setNames({ ...names, [row.id]: e.target.value })} /></label>)}
-        <button onClick={saveNames}><Save size={18} />表示名を保存</button>
+        {users.map((row) => (
+          <div key={row.id} className="user-profile-fields">
+            <strong>{row.email}</strong>
+            <label>表示名<input value={names[row.id] || ""} onChange={(e) => setNames({ ...names, [row.id]: e.target.value })} /></label>
+            <label>LINEユーザーID<input value={lineUserIds[row.id] || ""} onChange={(e) => setLineUserIds({ ...lineUserIds, [row.id]: e.target.value })} placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" /></label>
+          </div>
+        ))}
+        <button onClick={saveNames}><Save size={18} />ユーザー設定を保存</button>
       </section>}
 
       {section === "closing" && <section className="settings-panel page-panel">

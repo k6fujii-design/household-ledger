@@ -1,4 +1,4 @@
-export type User = { id: string; name: string; email: string };
+export type User = { id: string; name: string; email: string; line_user_id?: string | null };
 
 export type TicketStatus = "new" | "settled" | "canceled";
 

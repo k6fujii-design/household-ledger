@@ -20,16 +20,16 @@ def update_user(user_id: UUID, payload: UserUpdate, request: Request, store: Dyn
     if not name:
         raise HTTPException(status_code=400, detail="表示名を入力してください")
     try:
-        before, target = store.update_user_name(user_id, name)
+        before, target = store.update_user_profile(user_id, name, payload.line_user_id.strip() if payload.line_user_id else None)
     except KeyError:
         raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
     store.write_audit(
-        "setting_update_user_name",
+        "setting_update_user_profile",
         "user",
         user["id"],
         target["id"],
         before=before,
-        after={"name": target["name"]},
+        after={"name": target["name"], "line_user_id": target.get("line_user_id")},
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
     )

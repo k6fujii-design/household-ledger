@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import settings
-from app.routers import audit, auth, calendar, reports, settings as settings_router, tickets, users
+from app.routers import audit, auth, calendar, line_webhook, reports, settings as settings_router, tickets, users
 from app.store import store
 
 app = FastAPI(title="Household Budget App")
@@ -24,6 +24,7 @@ app.include_router(reports.router)
 app.include_router(calendar.router)
 app.include_router(settings_router.router)
 app.include_router(audit.router)
+app.include_router(line_webhook.router)
 
 
 @app.on_event("startup")
