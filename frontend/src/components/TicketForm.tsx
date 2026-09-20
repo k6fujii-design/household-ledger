@@ -5,6 +5,8 @@ import { ShareBar } from "./ShareBar";
 import type { Category, Ticket, TicketInput, TicketTemplate, User } from "../types";
 import { formatYen, userPair } from "../utils/display";
 import { CategoryIcon } from "./CategoryIcon";
+import { api } from "../api/client";
+import type { Tag } from "../types";
 
 const amountShortcuts = [100, 1000, 10000];
 const today = new Date().toISOString().slice(0, 10);
@@ -40,9 +42,12 @@ export function TicketForm({
   onClone?: () => void;
 }) {
   const pair = userPair(users);
+  const [tags, setTags] = useState<Tag[]>([]);
+  useEffect(() => { api.tags().then(setTags).catch(() => setError("タグの取得に失敗しました")); }, []);
   const initialPayer = ticket?.payer_user_id || draft?.payer_user_id || users[0]?.id || "";
   const [form, setForm] = useState<TicketInput>({
     date: ticket?.date || draft?.date || today,
+    tag_ids: ticket?.tag_ids || draft?.tag_ids || [],
     title: ticket?.title || draft?.title || "",
     amount: ticket?.amount ?? draft?.amount ?? 0,
     payer_user_id: initialPayer,
@@ -187,6 +192,12 @@ export function TicketForm({
         <span className="field-label">メモ</span>
         <textarea value={form.memo} onChange={(e) => setForm({ ...form, memo: e.target.value })} />
       </label>
+      <fieldset className="tag-selector">
+        <legend>タグ</legend>
+        <div className="preset-row">{tags.map((tag) => <label key={tag.id} className="tag-choice">
+          <input type="checkbox" checked={(form.tag_ids || []).includes(tag.id)} onChange={(e) => setForm({ ...form, tag_ids: e.target.checked ? [...(form.tag_ids || []), tag.id] : (form.tag_ids || []).filter((id) => id !== tag.id) })} />#{tag.name}
+        </label>)}</div>
+      </fieldset>
       <div className="actions">
         {onCancel && <button type="button" className="secondary" onClick={onCancel}><ArrowLeft size={18} />戻る</button>}
         {onClone && <button type="button" className="secondary" onClick={onClone}><CopyCheck size={18} />コピー</button>}

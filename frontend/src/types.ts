@@ -1,8 +1,11 @@
 export type User = { id: string; name: string; email: string; line_user_id?: string | null };
 
 export type TicketStatus = "new" | "settled" | "canceled";
+export type Tag = { id: string; name: string };
+export type AgentMemory = { id: string; content: string; created_at: string; scope?: "personal" | "shared" };
 
 export type Ticket = {
+  tag_ids?: string[];
   id: string;
   display_id: number;
   date: string;
@@ -25,6 +28,7 @@ export type Ticket = {
 };
 
 export type TicketInput = {
+  tag_ids?: string[];
   date: string;
   title: string;
   amount: number;

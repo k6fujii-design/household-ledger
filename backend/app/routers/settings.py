@@ -1,6 +1,8 @@
 from uuid import UUID
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 
 from app.routers.deps import current_user
 from app.schemas.settings import (
@@ -16,6 +18,72 @@ from app.schemas.settings import (
 from app.store import DynamoStore, get_store
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
+
+
+class TagIn(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+
+
+class MemoryIn(BaseModel):
+    content: str = Field(min_length=1, max_length=500)
+    scope: Literal["personal", "shared"] = "personal"
+
+
+@router.get("/tags")
+def list_tags(store: DynamoStore = Depends(get_store), user: dict = Depends(current_user)):
+    return store.list_tags()
+
+
+@router.post("/tags")
+def create_tag(payload: TagIn, store: DynamoStore = Depends(get_store), user: dict = Depends(current_user)):
+    try:
+        row = store.save_tag(payload.name)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    store.write_audit("setting_create_tag", "tag", user["id"], row["id"], after={"name": row["name"]})
+    return row
+
+
+@router.put("/tags/{tag_id}")
+def update_tag(tag_id: UUID, payload: TagIn, store: DynamoStore = Depends(get_store), user: dict = Depends(current_user)):
+    try:
+        row = store.save_tag(payload.name, str(tag_id))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    store.write_audit("setting_update_tag", "tag", user["id"], tag_id, after={"name": row["name"]})
+    return row
+
+
+@router.delete("/tags/{tag_id}")
+def delete_tag(tag_id: UUID, store: DynamoStore = Depends(get_store), user: dict = Depends(current_user)):
+    try:
+        store.delete_tag(str(tag_id))
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
+    store.write_audit("setting_delete_tag", "tag", user["id"], tag_id)
+    return {"ok": True}
+
+
+@router.get("/memories")
+def list_memories(scope: Literal["personal", "shared"] = "personal", store: DynamoStore = Depends(get_store), user: dict = Depends(current_user)):
+    return store.list_memories(user["id"], scope)
+
+
+@router.post("/memories")
+def create_memory(payload: MemoryIn, store: DynamoStore = Depends(get_store), user: dict = Depends(current_user)):
+    try:
+        row = store.save_memory(user["id"], payload.content, payload.scope)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    store.write_audit("agent_memory_create", "memory", user["id"], row["id"], after={"scope": payload.scope})
+    return row
+
+
+@router.delete("/memories/{memory_id}")
+def delete_memory(memory_id: UUID, scope: Literal["personal", "shared"] = "personal", store: DynamoStore = Depends(get_store), user: dict = Depends(current_user)):
+    store.delete_memory(user["id"], str(memory_id), scope)
+    store.write_audit("agent_memory_delete", "memory", user["id"], memory_id, before={"scope": scope})
+    return {"ok": True}
 
 
 def audit_context(request: Request) -> dict:

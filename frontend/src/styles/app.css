@@ -461,6 +461,25 @@ textarea { min-height: 86px; resize: vertical; }
   .donut-wrap { width: 176px; height: 176px; }
   .summary-visual-premium .donut { width: 164px !important; height: 164px !important; }
 }
+
+.tag-selector { min-width: 0; margin: 16px 0; border: 0; padding: 0; }
+.tag-selector .preset-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag-selector .tag-choice { display: inline-flex; align-items: center; gap: 6px; width: auto; padding: 8px 10px; border: 1px solid #c9c8d7; border-radius: 6px; background: #f6f5fa; font-size: 13px; overflow-wrap: anywhere; }
+.tag-selector .tag-choice input { width: 18px; height: 18px; margin: 0; flex-shrink: 0; }
+.ticket-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.ticket-tags:empty { display: none; }
+.ticket-tags span { background: #efedf7; color: #60577a; padding: 2px 6px; border-radius: 4px; font-size: 11px; overflow-wrap: anywhere; }
+.summary-tag-filter { display: flex; align-items: center; gap: 10px; margin: 8px 0 16px; font-size: 13px; }
+.summary-tag-filter select { min-width: 0; flex: 1; }
+.preference-panel form { display: grid; gap: 10px; }
+.preference-panel textarea { width: 100%; min-height: 80px; }
+.preference-list > div { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #ddd8d5; padding: 14px 0; }
+.preference-list span { flex: 1; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; font-size: 14px; }
+.preference-list .icon-button { flex-shrink: 0; }
+.summary-period-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.summary-period-tabs button { min-width: 0; font-size: 16px; padding-inline: 8px; }
+.memory-scopes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 16px; }
+.memory-scopes button { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .history-list { display: grid; gap: 10px; }
 .history-item {
   display: grid;

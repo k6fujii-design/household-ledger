@@ -1,5 +1,6 @@
 import json
 import logging
+import traceback
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
@@ -13,11 +14,25 @@ class JsonFormatter(logging.Formatter):
             "level": record.levelname,
             "event": getattr(record, "event", record.getMessage()),
         }
-        for key in ("user_id", "ticket_id", "action"):
+        for key in (
+            "request_id",
+            "conversation_id",
+            "line_user_hash",
+            "user_id",
+            "ticket_id",
+            "action",
+            "intent",
+            "pending_intent",
+            "tool",
+            "duration_ms",
+            "details",
+        ):
             value = getattr(record, key, None)
             if value is not None:
                 payload[key] = value
-        return json.dumps(payload, ensure_ascii=False)
+        if record.exc_info:
+            payload["exception"] = "".join(traceback.format_exception(*record.exc_info)).rstrip()
+        return json.dumps(payload, ensure_ascii=False, default=str)
 
 
 def setup_logging() -> None:

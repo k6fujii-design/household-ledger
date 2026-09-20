@@ -9,10 +9,13 @@ class Settings(BaseSettings):
     initial_user_2_name: str = "User 2"
     line_channel_secret: str | None = None
     line_channel_access_token: str | None = None
+    line_official_account_id: str = ""
     line_channel_secret_parameter_name: str | None = None
     line_channel_access_token_parameter_name: str | None = None
     line_agent_mode: str = "rules"
     line_agent_trace_enabled: bool = True
+    line_agent_diagnostic_logging: bool = True
+    line_agent_log_message_text: bool = False
     bedrock_model_id: str = "amazon.nova-lite-v1:0"
     aws_region: str = "ap-northeast-1"
     aws_access_key_id: str = "local"

@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Save } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { api } from "../api/client";
 import { ShareBar } from "../components/ShareBar";
@@ -8,7 +8,7 @@ import { formatYen } from "../utils/display";
 import { addMonths, currentPeriod, monthLabel } from "../utils/period";
 import { swipeDirection, type TouchPoint } from "../utils/swipe";
 
-type SummaryMode = "month" | "year";
+type SummaryMode = "month" | "year" | "all";
 
 const fallbackColors = ["#ef476f", "#ffd166", "#2ec4b6", "#8376ff", "#ff8f70", "#5fb0ff"];
 
@@ -40,6 +40,10 @@ export function SummaryPage({ users, categories, settings }: { users: User[]; ca
   const [mode, setMode] = useState<SummaryMode>("month");
   const [baseMonth, setBaseMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [category, setCategory] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [tags, setTags] = useState<import("../types").Tag[]>([]);
+  const [tagId, setTagId] = useState("");
+  useEffect(() => { api.tags().then(setTags).catch(() => setMessage("タグの取得に失敗しました")); }, []);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [monthly, setMonthly] = useState<MonthlySettlement | null>(null);
@@ -48,13 +52,14 @@ export function SummaryPage({ users, categories, settings }: { users: User[]; ca
 
   const period = mode === "month"
     ? currentPeriod(settings.closing_day, baseMonth)
+    : mode === "all" ? { from: "0001-01-01", to: "9999-12-31", key: "all" }
     : { from: `${baseMonth.getFullYear()}-01-01`, to: `${baseMonth.getFullYear()}-12-31`, key: `${baseMonth.getFullYear()}` };
   const periodKey = period.to.slice(0, 7);
 
   async function load() {
     const [summaryRow, ticketRows] = await Promise.all([
-      api.summary(period.from, period.to, "new,settled", category),
-      api.tickets(`?from=${period.from}&to=${period.to}${category ? `&category=${encodeURIComponent(category)}` : ""}`)
+      api.summary(period.from, period.to, "new,settled", category, tagId),
+      api.tickets(`?from=${period.from}&to=${period.to}${category ? `&category=${encodeURIComponent(category)}` : ""}${tagId ? `&tag_id=${encodeURIComponent(tagId)}` : ""}`)
     ]);
     setSummary(summaryRow);
     setTickets(ticketRows.filter((ticket) => ticket.status !== "canceled"));
@@ -67,8 +72,8 @@ export function SummaryPage({ users, categories, settings }: { users: User[]; ca
   }
 
   useEffect(() => {
-    load();
-  }, [period.from, period.to, category, mode]);
+    load().catch((e) => setMessage(e.message));
+  }, [period.from, period.to, category, mode, tagId]);
 
   const categoryRows = useMemo(() => {
     const map = new Map<string, { name: string; amount: number; ratioF: number; ratioO: number; shareF: number; shareO: number; count: number; color: string; category?: Category }>();
@@ -141,6 +146,7 @@ export function SummaryPage({ users, categories, settings }: { users: User[]; ca
   }
 
   function move(diff: number) {
+    if (mode === "all") return;
     setBaseMonth(mode === "month" ? addMonths(baseMonth, diff) : new Date(baseMonth.getFullYear() + diff, 0, 1));
   }
 
@@ -152,20 +158,25 @@ export function SummaryPage({ users, categories, settings }: { users: User[]; ca
 
   return (
     <main className="screen ledger-screen" onTouchStart={(e) => setTouchStart({ x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY })} onTouchEnd={(e) => handleTouchEnd({ x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY })}>
-      <div className="summary-tabs">
+      <div className="summary-tabs summary-period-tabs">
         <button className={mode === "month" ? "on" : ""} onClick={() => setMode("month")}>月次</button>
         <button className={mode === "year" ? "on" : ""} onClick={() => setMode("year")}>年次</button>
+        <button className={mode === "all" ? "on" : ""} onClick={() => setMode("all")}>全期間</button>
       </div>
       <header className="month-switch">
-        <button className="ghost-icon" onClick={() => move(-1)}><ChevronLeft /></button>
-        <strong>{mode === "month" ? monthLabel(baseMonth) : `${baseMonth.getFullYear()}年`}</strong>
-        <button className="ghost-icon" onClick={() => move(1)}><ChevronRight /></button>
+        <button className="ghost-icon" disabled={mode === "all"} onClick={() => move(-1)}><ChevronLeft /></button>
+        <strong>{mode === "all" ? "全期間" : mode === "month" ? monthLabel(baseMonth) : `${baseMonth.getFullYear()}年`}</strong>
+        <button className="ghost-icon" disabled={mode === "all"} onClick={() => move(1)}><ChevronRight /></button>
       </header>
-      <select className="calendar-category" value={category} onChange={(e) => setCategory(e.target.value)}>
+      <button className="secondary filter-toggle" aria-expanded={showFilters} aria-controls="summary-filters" onClick={() => setShowFilters(!showFilters)}><SlidersHorizontal size={18} />フィルター{(category || tagId) ? "（適用中）" : ""}</button>
+      {showFilters && <section id="summary-filters" className="calendar-filter-panel">
+      <select aria-label="カテゴリ" className="calendar-category" value={category} onChange={(e) => setCategory(e.target.value)}>
         <option value="">全カテゴリ</option>
         {categories.map((row) => <option key={row.id} value={row.name}>{row.name}</option>)}
       </select>
 
+      <label className="summary-tag-filter">タグ<select value={tagId} onChange={(e) => setTagId(e.target.value)}><option value="">すべてのチケット</option>{tags.map((tag) => <option key={tag.id} value={tag.id}>#{tag.name}</option>)}</select></label>
+      </section>}
       <section className="summary-visual summary-visual-premium">
         <div className="donut-wrap">
           <div className="donut" style={pieStyle}>

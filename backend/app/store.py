@@ -215,6 +215,53 @@ class DynamoStore:
     def list_templates(self) -> list[dict[str, Any]]:
         return sorted(self._items("TEMPLATE"), key=lambda row: row["name"])
 
+    def list_tags(self) -> list[dict[str, Any]]:
+        return sorted(self._items("TAG"), key=lambda row: row["name"])
+
+    def save_tag(self, name: str, tag_id: str | None = None) -> dict[str, Any]:
+        name = name.strip().lstrip("#＃").strip()
+        if not name or len(name) > 60:
+            raise ValueError("タグ名は1〜60文字で指定してください。")
+        if tag_id and not self._get("TAG", tag_id):
+            raise ValueError("タグが見つかりません。")
+        existing = next((row for row in self.list_tags() if row["name"] == name), None)
+        if existing:
+            if tag_id and existing["id"] != tag_id:
+                raise ValueError("同じ名前のタグがあります。")
+            return existing
+        row = {"id": tag_id or str(uuid4()), "name": name}
+        return self._put("TAG", row["id"], row)
+
+    def delete_tag(self, tag_id: str) -> None:
+        if any(tag_id in row.get("tag_ids", []) for row in self._items("TICKET") if not row.get("deleted_at")):
+            raise ValueError("使用中のタグは削除できません。先にチケットから外してください。")
+        self._delete("TAG", tag_id)
+
+    @staticmethod
+    def _memory_partition(user_id: str, scope: str) -> str:
+        if scope not in {"personal", "shared"}:
+            raise ValueError("記憶の範囲が不正です。")
+        return "AGENT_MEMORY_SHARED" if scope == "shared" else f"AGENT_MEMORY#{user_id}"
+
+    def list_memories(self, user_id: str, scope: str = "personal") -> list[dict[str, Any]]:
+        return [{**row, "scope": scope} for row in sorted(self._items(self._memory_partition(user_id, scope)), key=lambda row: row["created_at"])]
+
+    def save_memory(self, user_id: str, content: str, scope: str = "personal") -> dict[str, Any]:
+        content = content.strip()
+        if not content or len(content) > 500:
+            raise ValueError("記憶は1〜500文字で指定してください。")
+        memories = self.list_memories(user_id, scope)
+        existing = next((row for row in memories if row["content"] == content), None)
+        if existing:
+            return existing
+        if len(memories) >= 30:
+            raise ValueError("記憶は30件までです。設定で不要な記憶を削除してください。")
+        row = {"id": str(uuid4()), "content": content, "created_at": now_iso()}
+        return self._put(self._memory_partition(user_id, scope), row["id"], {**row, "scope": scope})
+
+    def delete_memory(self, user_id: str, memory_id: str, scope: str = "personal") -> None:
+        self._delete(self._memory_partition(user_id, scope), memory_id)
+
     def create_template(self, payload: dict[str, Any]) -> dict[str, Any]:
         row = {"id": str(uuid4()), **jsonable(payload)}
         return self._put("TEMPLATE", row["id"], row)
@@ -249,6 +296,9 @@ class DynamoStore:
         return before, row
 
     def _ticket_from_payload(self, payload: TicketCreate | TicketUpdate, actor_id: UUID, ticket: dict[str, Any] | None = None) -> dict[str, Any]:
+        tag_ids = list(dict.fromkeys(str(value) for value in payload.tag_ids))
+        if any(not self._get("TAG", tag_id) for tag_id in tag_ids):
+            raise ValueError("設定に存在しないタグが指定されています。")
         share_f, share_o = calculate_shares(payload.amount, payload.ratio_f, payload.ratio_o)
         timestamp = now_iso()
         row = ticket.copy() if ticket else {
@@ -270,6 +320,7 @@ class DynamoStore:
             "status": payload.status,
             "category": payload.category.strip() or "その他",
             "memo": payload.memo,
+            "tag_ids": tag_ids,
             "updated_by": str(actor_id),
             "updated_at": timestamp,
         })
@@ -295,6 +346,7 @@ class DynamoStore:
         category: str | None = None,
         payer_user_id: UUID | None = None,
         keyword: str | None = None,
+        tag_id: str | None = None,
     ) -> list[dict[str, Any]]:
         rows = [row for row in self._items("TICKET") if not row.get("deleted_at")]
         if from_date:
@@ -313,6 +365,8 @@ class DynamoStore:
             rows = [row for row in rows if row["payer_user_id"] == str(payer_user_id)]
         if keyword:
             rows = [row for row in rows if keyword.lower() in row["title"].lower()]
+        if tag_id:
+            rows = [row for row in rows if tag_id in row.get("tag_ids", [])]
         rows.sort(key=lambda row: (row["date"], row["created_at"]), reverse=True)
         display_ids = self.ticket_display_ids()
         return [self.with_payer_name(row, display_ids) for row in rows]
@@ -356,6 +410,7 @@ class DynamoStore:
 
     def with_payer_name(self, ticket: dict[str, Any], display_ids: dict[str, int] | None = None) -> dict[str, Any]:
         row = ticket.copy()
+        row.setdefault("tag_ids", [])
         row["category"] = row.get("category") or "その他"
         user = self.get_user(row["payer_user_id"])
         row["payer_name"] = user["name"] if user else None
@@ -376,10 +431,11 @@ class DynamoStore:
             "status": ticket["status"],
             "category": ticket.get("category", ""),
             "memo": ticket.get("memo", ""),
+            "tag_ids": ticket.get("tag_ids", []),
         }
 
-    def summarize(self, from_date: date, to_date: date, statuses: list[str], category: str | None = None) -> dict[str, Any]:
-        tickets = self.list_tickets(from_date, to_date, statuses=statuses, category=category)
+    def summarize(self, from_date: date, to_date: date, statuses: list[str], category: str | None = None, tag_id: str | None = None) -> dict[str, Any]:
+        tickets = self.list_tickets(from_date, to_date, statuses=statuses, category=category, tag_id=tag_id)
         users = {row["email"]: row for row in self.list_users()}
         user_f = users.get("f@example.com")
         user_o = users.get("o@example.com")

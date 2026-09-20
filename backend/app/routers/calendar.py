@@ -11,14 +11,14 @@ router = APIRouter(prefix="/api/calendar", tags=["calendar"])
 
 
 @router.get("/month", response_model=CalendarMonthResponse)
-def month(year: int, month: int, statuses: str | None = None, category: str | None = None, store: DynamoStore = Depends(get_store), user: dict = Depends(current_user)):
+def month(year: int, month: int, statuses: str | None = None, category: str | None = None, tag_id: str | None = None, store: DynamoStore = Depends(get_store), user: dict = Depends(current_user)):
     status_list = statuses.split(",") if statuses else ["new", "settled"]
     first = date(year, month, 1)
     last = date(year, month, monthrange(year, month)[1])
     users = {row["email"]: row for row in store.list_users()}
     user_f = users.get("f@example.com")
     user_o = users.get("o@example.com")
-    rows = store.list_tickets(first, last, statuses=status_list, category=category)
+    rows = store.list_tickets(first, last, statuses=status_list, category=category, tag_id=tag_id)
     by_day: dict[str, dict] = {}
     for ticket in rows:
         day = by_day.setdefault(ticket["date"], {"date": ticket["date"], "total_amount": 0, "ticket_count": 0, "paid_by_f": 0, "paid_by_o": 0})
@@ -32,14 +32,14 @@ def month(year: int, month: int, statuses: str | None = None, category: str | No
 
 
 @router.get("/year", response_model=CalendarYearResponse)
-def year(year: int, statuses: str | None = None, category: str | None = None, store: DynamoStore = Depends(get_store), user: dict = Depends(current_user)):
+def year(year: int, statuses: str | None = None, category: str | None = None, tag_id: str | None = None, store: DynamoStore = Depends(get_store), user: dict = Depends(current_user)):
     status_list = statuses.split(",") if statuses else ["new", "settled"]
     first = date(year, 1, 1)
     last = date(year, 12, 31)
     users = {row["email"]: row for row in store.list_users()}
     user_f = users.get("f@example.com")
     user_o = users.get("o@example.com")
-    rows = store.list_tickets(first, last, statuses=status_list, category=category)
+    rows = store.list_tickets(first, last, statuses=status_list, category=category, tag_id=tag_id)
     by_month = {
         month: {"month": month, "total_amount": 0, "ticket_count": 0, "paid_by_f": 0, "paid_by_o": 0}
         for month in range(1, 13)

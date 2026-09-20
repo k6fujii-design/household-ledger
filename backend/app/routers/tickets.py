@@ -18,15 +18,19 @@ def list_tickets(
     category: str | None = None,
     payer_user_id: UUID | None = None,
     keyword: str | None = None,
+    tag_id: str | None = None,
     store: DynamoStore = Depends(get_store),
     user: dict = Depends(current_user),
 ):
-    return store.list_tickets(from_, to, status=status, category=category, payer_user_id=payer_user_id, keyword=keyword)
+    return store.list_tickets(from_, to, status=status, category=category, payer_user_id=payer_user_id, keyword=keyword, tag_id=tag_id)
 
 
 @router.post("", response_model=TicketOut)
 def create_ticket(payload: TicketCreate, request: Request, store: DynamoStore = Depends(get_store), user: dict = Depends(current_user)):
-    ticket = store.create_ticket(payload, UUID(user["id"]))
+    try:
+        ticket = store.create_ticket(payload, UUID(user["id"]))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     store.write_audit(
         "ticket_create",
         "ticket",
@@ -68,6 +72,8 @@ def get_ticket(ticket_id: UUID, store: DynamoStore = Depends(get_store), user: d
 def update_ticket(ticket_id: UUID, payload: TicketUpdate, request: Request, store: DynamoStore = Depends(get_store), user: dict = Depends(current_user)):
     try:
         before, ticket = store.update_ticket(ticket_id, payload, UUID(user["id"]))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     except KeyError:
         raise HTTPException(status_code=404, detail="チケットが見つかりません")
     store.write_audit(

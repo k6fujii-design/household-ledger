@@ -4,7 +4,7 @@ import { api } from "../api/client";
 import { CategoryIcon, categoryForName } from "../components/CategoryIcon";
 import { ShareBar } from "../components/ShareBar";
 import { StatusBadge } from "../components/StatusBadge";
-import type { Category, Ticket, User } from "../types";
+import type { Category, Tag, Ticket, User } from "../types";
 import { formatYen, userPair } from "../utils/display";
 
 export function TicketDetailPage({ id, users, categories, onBack, onEdit }: {
@@ -15,6 +15,9 @@ export function TicketDetailPage({ id, users, categories, onBack, onEdit }: {
   onEdit: (id: string) => void;
 }) {
   const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [error, setError] = useState("");
+  useEffect(() => { api.tags().then(setTags).catch((e) => setError(e.message)); }, []);
   const pair = userPair(users);
   useEffect(() => { api.ticket(id).then(setTicket); }, [id]);
 
@@ -39,6 +42,8 @@ export function TicketDetailPage({ id, users, categories, onBack, onEdit }: {
         <article><ReceiptText /><span>負担比率</span><strong>{pair.first} {ticket.ratio_f}：{ticket.ratio_o} {pair.second}</strong></article>
       </section>
       <section className="detail-share-card">
+        {error && <div role="alert">{error}</div>}
+        <div className="ticket-tags">{tags.filter((tag) => ticket.tag_ids?.includes(tag.id)).map((tag) => <span key={tag.id}>#{tag.name}</span>)}</div>
         <h2>二人の負担額</h2>
         <ShareBar users={users} ratioF={ticket.ratio_f} ratioO={ticket.ratio_o} amountF={ticket.share_f} amountO={ticket.share_o} percent />
       </section>

@@ -128,7 +128,8 @@ export default function App() {
       ratio_o: ticket.ratio_o,
       status: "new",
       category: ticket.category,
-      memo: ticket.memo
+      memo: ticket.memo,
+      tag_ids: ticket.tag_ids || []
     });
     navigate("create");
   };

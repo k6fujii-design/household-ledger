@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 VALID_STATUSES = {"new", "settled", "canceled"}
 
@@ -16,6 +16,7 @@ class TicketBase(BaseModel):
     status: str = "new"
     category: str = ""
     memo: str = ""
+    tag_ids: list[UUID] = Field(default_factory=list, max_length=20)
 
     @field_validator("status")
     @classmethod
@@ -34,10 +35,14 @@ class TicketBase(BaseModel):
 
 
 class TicketCreate(TicketBase):
-    pass
+    @model_validator(mode="after")
+    def valid_share_total(self):
+        if self.ratio_f + self.ratio_o != 10:
+            raise ValueError("負担比率の合計は10（100%）にしてください")
+        return self
 
 
-class TicketUpdate(TicketBase):
+class TicketUpdate(TicketCreate):
     pass
 
 

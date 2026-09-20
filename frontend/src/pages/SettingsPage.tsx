@@ -3,8 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { AppSettings, AuditLog, Category, TicketTemplate, TicketTemplateInput, User } from "../types";
 import { CategoryIcon } from "../components/CategoryIcon";
+import { PreferencesPanel } from "../components/PreferencesPanel";
+import { Brain, Tags } from "lucide-react";
 
-type SettingsSection = "menu" | "names" | "closing" | "categories" | "templates" | "history" | "about";
+type SettingsSection = "menu" | "names" | "closing" | "categories" | "templates" | "history" | "about" | "tags" | "memories";
 
 const emptyTemplate: TicketTemplateInput = {
   name: "",
@@ -35,6 +37,11 @@ const actionLabels: Record<string, string> = {
   setting_create_template: "テンプレート追加",
   setting_update_template: "テンプレート編集",
   setting_delete_template: "テンプレート削除",
+  setting_create_tag: "タグ追加",
+  setting_update_tag: "タグ編集",
+  setting_delete_tag: "タグ削除",
+  agent_memory_create: "AIの記憶追加",
+  agent_memory_delete: "AIの記憶削除",
   setting_update_monthly_settlement: "月次メモ更新"
 };
 
@@ -70,6 +77,7 @@ export function SettingsPage({
   onLogout: () => void;
 }) {
   const [section, setSection] = useState<SettingsSection>("menu");
+  const [memoryScope, setMemoryScope] = useState<"shared" | "personal">("personal");
   const [names, setNames] = useState<Record<string, string>>({});
   const [lineUserIds, setLineUserIds] = useState<Record<string, string>>({});
   const [closingDay, setClosingDay] = useState(settings.closing_day);
@@ -150,6 +158,8 @@ export function SettingsPage({
           closing: "締め日",
           categories: "カテゴリ",
           templates: "チケットテンプレート",
+          tags: "タグ",
+          memories: "AIの記憶",
           history: "履歴",
           about: "アプリ情報"
         }[section]}</h1>
@@ -164,6 +174,8 @@ export function SettingsPage({
             { key: "closing", label: "締め日", Icon: CalendarClock },
             { key: "categories", label: "カテゴリ", Icon: Palette },
             { key: "templates", label: "チケットテンプレート", Icon: ReceiptText },
+            { key: "tags", label: "タグ", Icon: Tags },
+            { key: "memories", label: "AIの記憶", Icon: Brain },
             { key: "history", label: "履歴", Icon: History },
             { key: "about", label: "技術詳細", Icon: Github }
           ].map(({ key, label, Icon }) => (
@@ -177,6 +189,11 @@ export function SettingsPage({
         </section>
       )}
 
+      {section === "memories" && <div className="segmented memory-scopes">
+        <button aria-pressed={memoryScope === "shared"} className={memoryScope === "shared" ? "on" : ""} onClick={() => setMemoryScope("shared")}>共通</button>
+        <button aria-pressed={memoryScope === "personal"} className={memoryScope === "personal" ? "on" : ""} onClick={() => setMemoryScope("personal")}>{users.find((row) => row.id === user.id)?.name || user.name}向け</button>
+      </div>}
+      {(section === "tags" || section === "memories") && <PreferencesPanel key={`${section}-${memoryScope}`} kind={section} scope={memoryScope} displayName={users.find((row) => row.id === user.id)?.name || user.name} />}
       {section === "names" && <section className="settings-panel page-panel">
         {users.map((row) => (
           <div key={row.id} className="user-profile-fields">

@@ -62,6 +62,8 @@ Household Ledgerは、同居・家族・パートナー間の立替精算をシ�
 - ホーム画面での月次精算状況、未精算額、精算済み額の確認
 - チケット一覧でのステータス、カテゴリ、日付、金額順検索
 - カテゴリ管理、テンプレート管理、締め日設定
+- タグ定義管理、チケットへの複数タグ設定、タグ別の月次・年次・全期間集計
+- ユーザーごとのAIへの注意事項の保存・参照・削除
 - 月次、年次の集計
 - カテゴリ別円グラフ、年次棒グラフ
 - カレンダー表示
@@ -69,6 +71,16 @@ Household Ledgerは、同居・家族・パートナー間の立替精算をシ�
 - 操作履歴
 - LINEからのチケット登録、確認、更新、削除
 - Bedrockを使った自然言語解析モード
+
+### タグで旅行・イベント費を集計する
+
+1. 「設定」>「タグ」で「北海道旅行」などのタグを作成します（先頭の`#`は省略できます）。
+2. チケット作成・編集でタグを選択します。複数選択でき、カテゴリとは独立して保存されます。
+3. 「集計」でタグを選択します。「全期間」を選べば日付や月をまたぐ費用をまとめて確認できます。カテゴリでも追加で絞れます。
+
+未精算・精算済みのチケットを合算し、取り消し・削除済みは除外します。タグが複数付いても同じチケットを重複計上しません。各タグの集計同士には同じチケットが含まれることがあるので、タグ別総額の単純合算には注意してください。
+
+チケット一覧でもタグで検索できます。タグの改名は既存の紐付けを維持します。使用中のタグを削除する場合は、先にチケットから外してください。既存チケットはタグなしとして動作し、移行作業は不要です。
 
 ## AWS構成
 
@@ -305,15 +317,43 @@ npm.cmd run build -- --outDir dist-cdk --emptyOutDir true
 
 ### 6. CDKデプロイ
 
+`sessionSecret`はWebアプリのログインセッションCookieを署名する秘密値です。ログインパスワードとは別の値です。新しくPowerShellを開いた場合は、デプロイ前に毎回 `$sessionSecret` を定義してください。
+
+初回は、32バイトのランダム値を生成します。生成した値はパスワードマネージャーなどの安全な場所に保管し、GitやREADMEには記載しないでください。
+
+```powershell
+$secretBytes = New-Object byte[] 32
+$randomGenerator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$randomGenerator.GetBytes($secretBytes)
+$randomGenerator.Dispose()
+$sessionSecret = [Convert]::ToBase64String($secretBytes)
+```
+
+更新デプロイでは、保管している前回と同じ値を設定します。
+
+```powershell
+$sessionSecret = "保管している前回と同じ値"
+```
+
+未定義や空文字のまま実行しないよう、デプロイ直前に確認します。この確認では秘密値そのものは表示しません。
+
+```powershell
+if ([string]::IsNullOrWhiteSpace($sessionSecret) -or $sessionSecret.Length -lt 32) {
+    throw "sessionSecretが未定義、または32文字未満です。"
+}
+```
+
+CDK側でも同じ検証を行うため、未指定または32文字未満の場合はデプロイを開始せずエラー終了します。
+
 ```powershell
 cd ..\infra
-npx.cmd cdk deploy --profile household-admin -c sessionSecret="十分に長いランダム文字列" -c lineAgentMode="rules"
+npx.cmd cdk deploy --profile household-admin -c sessionSecret="$sessionSecret" -c lineAgentMode="rules"
 ```
 
 Bedrockを使う場合は`lineAgentMode="bedrock"`を指定します。
 
 ```powershell
-npx.cmd cdk deploy --profile household-admin -c sessionSecret="十分に長いランダム文字列" -c lineAgentMode="bedrock" -c bedrockModelId="amazon.nova-lite-v1:0"
+npx.cmd cdk deploy --profile household-admin -c sessionSecret="$sessionSecret" -c lineAgentMode="bedrock" -c bedrockModelId="amazon.nova-lite-v1:0"
 ```
 
 デプロイ後、出力されるURLを確認します。
@@ -327,19 +367,77 @@ npx.cmd cdk deploy --profile household-admin -c sessionSecret="十分に長い�
 
 ### 更新デプロイ
 
+**LINEでAIの要約・自然なコメントを使う場合は、更新時も必ず `-c lineAgentMode="bedrock"` と現在の `-c bedrockModelId="..."` を指定してください。** CDKは未指定の場合 `rules` になります。`rules` は生成AIを呼ばないため、件名の要約や話題に応じたコメントはできません。以下の一般手順の `rules` はルール版向けです。AI版は後述のモデルIDを入力する手順を利用してください。
+
+Bedrockの呼び出し・JSON解析に失敗した場合は、その旨をLINEへ返し、入力をそのまま件名として登録する処理には進みません。CloudWatchの `bedrock_intent_failed` / `bedrock_intent_skipped` とLambdaの `LINE_AGENT_MODE` を確認してください。件名・コメント不足時の補完は最大1回のみで、その場合は追加のモデル呼び出し料金がかかります。負担比率は現在のスライダーと同じ10段階で扱い、合計10（100%）を保存時にも検証します。
+
 画面変更をAWSに反映する場合も、先に`frontend/dist-cdk`を作り直してからCDKデプロイします。  
 CDKデプロイでは、Lambdaコンテナイメージの更新、S3へのフロントエンド配置、CloudFrontキャッシュ削除が行われます。
 
+新しくPowerShellを開いた場合、最初に保管済みの値を設定して検証します。更新のたびに別の値を生成すると、既存のログインセッションがすべて無効になります。
+
 ```powershell
+$sessionSecret = "保管している前回と同じ値"
+if ([string]::IsNullOrWhiteSpace($sessionSecret) -or $sessionSecret.Length -lt 32) {
+    throw "sessionSecretが未定義、または32文字未満です。"
+}
+
 cd C:\Users\srnty\OneDrive\ドキュメント\VSCode_dir\household-budget-app\frontend
 Remove-Item -Recurse -Force .\dist-cdk -ErrorAction SilentlyContinue
 npm.cmd run build -- --outDir dist-cdk --emptyOutDir true
 
 cd ..\infra
-npx.cmd cdk deploy --profile household-admin -c sessionSecret="前回と同じ値" -c lineAgentMode="rules"
+npx.cmd cdk deploy --profile household-admin -c sessionSecret="$sessionSecret" -c lineAgentMode="rules"
 ```
 
 `cdk deploy`で`no changes`と表示された場合でも、`BucketDeployment`のアセット差分があればフロントエンドは更新されます。画面が古い場合は、ビルド先が`frontend/dist-cdk`になっているか確認してください。
+
+**AIの記憶・自然言語のタグ操作を使う環境では、上のデプロイコマンドの`lineAgentMode="rules"`を`lineAgentMode="bedrock"`に変更してください。** モデルIDなどの既存の追加コンテキスト指定も引き継ぎます。今回の機能は既存DynamoDBテーブルに保存するため、新しいAWSリソースやIAM権限、手動のDB移行は不要です。ローカル更新はプロジェクト直下で`docker compose up -d --build`を実行します。
+
+### カレンダーのタグ・LINE編集画面の更新
+
+カレンダーの「フィルター」でタグを指定すると、日別金額・件数・月次表示合計・選択日のチケット一覧に同じ条件が適用されます。カテゴリとステータスも併用できます。「すべて」では取り消しチケットも含む従来の仕様です。
+
+編集フォームの「LINEに戻る」リンクは、端末で動作しないため撤去しました。変更を保存した後は、LINE内ブラウザ上部の×（閉じる）で元のトークへ戻ってください。外部ブラウザの場合はLINEアプリへ切り替えます。変更後の確認メッセージをLINEに送る処理は継続しています。フォーム保存だけではチケット登録は完了せず、LINEで「登録する」を選んで確定します。過去の`lineOfficialAccountId`設定は互換性のため残っていますが、現在の編集画面では使いません。
+
+以下をPowerShellで実行します。Docker Desktopを起動し、**前回と同じsessionSecret・モデルID・その他のカスタム設定を引き継いでください**。
+
+```powershell
+$sessionSecret = Read-Host "保管している前回と同じsessionSecretを入力" -MaskInput
+if ([string]::IsNullOrWhiteSpace($sessionSecret) -or $sessionSecret.Trim().Length -lt 32) {
+    throw "sessionSecretは前回と同じ32文字以上の値が必要です。"
+}
+$bedrockModelId = Read-Host "現在利用中のBedrockモデルID（Haiku等、推論プロファイルIDも含む）"
+if ([string]::IsNullOrWhiteSpace($bedrockModelId)) { throw "現在のモデルIDを指定してください" }
+
+cd C:\Users\srnty\OneDrive\ドキュメント\VSCode_dir\household-budget-app\frontend
+npm.cmd ci
+if ($LASTEXITCODE -ne 0) { throw "npm ci failed" }
+npm.cmd run build -- --outDir dist-cdk --emptyOutDir true
+if ($LASTEXITCODE -ne 0) { throw "frontend build failed" }
+
+cd ..\infra
+npm.cmd ci
+if ($LASTEXITCODE -ne 0) { throw "infra npm ci failed" }
+npm.cmd run build
+if ($LASTEXITCODE -ne 0) { throw "infra build failed" }
+$deployArgs = @("--profile", "household-admin", "-c", "sessionSecret=$sessionSecret",
+    "-c", "lineAgentMode=bedrock", "-c", "bedrockModelId=$bedrockModelId")
+npx.cmd cdk diff @deployArgs
+if ($LASTEXITCODE -ne 0) { throw "cdk diff failed" }
+if ((Read-Host "差分を確認しましたか？続行する場合は DEPLOY と入力") -ne "DEPLOY") { throw "中止しました" }
+npx.cmd cdk deploy @deployArgs
+if ($LASTEXITCODE -ne 0) { throw "cdk deploy failed" }
+Remove-Variable sessionSecret, deployArgs
+```
+
+`Read-Host -MaskInput`はPowerShell 7.1以降用です。Windows PowerShell 5.1では、代わりに`$secretInput = Read-Host "sessionSecret" -AsSecureString`、`$sessionSecret = [System.Net.NetworkCredential]::new("", $secretInput).Password`を使えます。カスタムSSMパラメータ名等を設定している場合は、既存の`-c`指定も`$deployArgs`に追加します。`cdk diff`に意図しない変更・置換が出た場合はデプロイせず設定を確認してください。
+
+更新後は画面を再読み込みし、タグの有無でカレンダー合計と日別一覧が一致することを確認します。LINEでは**新たに**登録候補を作って編集リンクを開き、変更保存後に画面上部の×で戻ってください。今回LIFF化はしていないため、`liff.closeWindow()`や動作を保証できない`window.close()`は使いません。SSMシークレットの変更・Webhook URLの再登録・DB移行は不要です。
+
+ローカルではプロジェクト直下で`docker compose up -d --build`を実行します。LINE復帰のための追加ID設定は不要です。
+
+スマートフォン実機で、保存後の確認メッセージとブラウザを閉じる動作を確認してください。
 
 ## LINE連携とAIエージェント
 
@@ -350,11 +448,14 @@ LINEのチャットから自然文で家計簿を操作できます。
 - チケット登録
 - 入力不足時の聞き返し
 - 登録前確認
+- 登録内容に応じた短いリアクション
+- 家計簿操作以外の雑談へのフレンドリーな応答
+- スマートフォン向け編集フォームによる登録候補の修正
 - チケット更新
 - チケット削除
 - 「さっきのチケット」など直近文脈を使った操作
 - 月次、年次、カテゴリ別の利用傾向の質問応答
-- AIがどのように解釈したかの処理ログ表示
+- LINE返信は確認内容と結果のみを表示（診断ログはサーバー側に保存）
 
 ### 必要なもの
 
@@ -398,7 +499,46 @@ LINEの`source.userId`は、同じMessaging API Channel内でユーザーごと�
 チケットID 10 金額3500円に変更
 チケットID 10 削除
 さっきのチケット消して
+マリカ楽しー
+今後、件名は店名を中心に短くして。覚えておいて
+覚えている注意事項を教えて
+件名を短くする注意事項は忘れて
+北海道旅行というタグを作成して
+昨日の昼食1800円、タグは北海道旅行で登録して
+さっきのチケットに北海道旅行のタグを追加して
+北海道旅行で全部いくら使った？
+今月の北海道旅行の支出は？
+タグ一覧を見せて
+北海道旅行のタグ名を札幌旅行に変更して
 ```
+
+チケット作成の確認メッセージには、短時間だけ利用できる編集リンクが表示されます。リンク先では、件名、日付、金額、カテゴリ、立替者、負担比率、ステータス、メモを画面操作で変更できます。カテゴリ、立替者、ステータスは選択式、日付と金額は型付き入力、負担比率はスライダーです。
+
+変更を保存すると、LINEへ更新後の確認メッセージが届きます。内容を確認して「登録する」または「やめる」を選択してください。登録完了またはキャンセル時には会話状態と編集リンクが破棄され、次の入力は新しい会話として扱われます。
+
+### AIの記憶とタグ操作
+
+「設定」>「AIの記憶」で「共通」と「表示名向け」を切り替えます。「共通」は二人とも閲覧・追加・削除でき、どちらのLINE操作にも適用されます。「表示名向け」はログイン中のユーザー専用で、設定した現在の表示名を使います。既存の記憶はそのまま個人向けとして残り、移行は不要です。AIには共通と送信者本人向けの両方を渡し、競合する場合は最新の指示、本人向け、共通の順で優先するよう指示しています。
+
+LINEでも「共通で、件名には店名を入れるように覚えて」「共通の記憶を教えて」「共通の○○という注意事項を忘れて」と指定できます。範囲の指定がなければ送信者本人向けです。
+
+支出の短文は登録という語がなくても作成候補として扱います。例:「サミットで魚かって３０００円」。全角数字を正規化し、AIが雑談・不明と判断しても支出らしい入力は登録確認へ進みます。金額がなければ聞き返します。更新・削除・集計などの明確な指示や否定・購入前の相談を新規登録にすり替えないようにしています。登録前確認は維持します。
+
+LINEの「処理ログ」の追記は廃止しました。`lineAgentTraceEnabled`の以前の設定値にかかわらず返信には表示しません。CloudWatchの診断ログと操作履歴は継続します。集計画面のカテゴリ・タグは「フィルター」を開いたときだけ表示し、閉じても選択条件を維持します。
+
+`bedrock`モードでは「覚えて」「今後は〜」と明示した注意事項を保存します。「回答は簡潔にしてください」など、記憶という語がなくても継続的な振る舞いへの要望と判断した場合は保存先を示し「この方針を保存／保存しない」を提示します。保存する選択を受けてDBへ書き込み、成功後に保存完了を返します。一回のチケット修正は長期記憶にしません。相手ユーザーの個人向け記憶は参照しません。
+
+「昨日の○○のチケットを更新したい」のような依頼は、件名キーワードと日付から最大5件の候補を表示します。番号で選択後、変更したい項目と値を伝え、更新前確認で確定します。対象チケットの条件と変更内容を別のターンで扱うため、元の日付を変更指示として誤用しません。確認中の追加修正でも選択したチケットと既存の修正内容を保持します。候補がない場合は条件を変えて検索し直してください。候補選択や方針保存のボタン処理ではモデルを再呼び出ししません。
+
+これらは既存Lambda + Bedrock Runtime APIの改善です。AgentCoreへの移行やモデルの変更は行っていません。実モデルの意図判定には不確実性があるため、生成結果だけで確定せず、更新前確認・保存確認・入力検証を継続します。
+
+保存済み注意事項は、次回以降のBedrockによる解析に参考情報として渡され、件名・カテゴリの判断や短いコメントの口調などに利用されます。最新の明示的な指示、認証、登録前確認、項目の型・範囲が優先されます。生成AIによる反映なので、すべての注意事項を常に厳密に遵守する保証はありません。集計結果など定型の返信はプログラム側で生成します。
+
+記憶は共通30件、各ユーザーの個人向け30件、1件500文字まで。3分の会話タイムアウトや登録完了・キャンセルでは消えず、明示的に削除するまで残ります。パスワードやAPIトークンは記憶に登録しないでください。記憶はBedrockへの入力に含まれるため、保存量に応じて入力トークン量が増えます。診断ログの`agent_preferences_loaded`には利用した記憶IDを記録し、本文は通常ログに出しません（メッセージ全文ログを有効にした場合は入力・応答に含まれ得ます）。
+
+LINEからタグ定義の作成・一覧・改名・未使用タグの削除、チケットへの付与・解除、タグ集計ができます。知らないタグ名が指定されたら先に作成を促します。編集フォームでもタグを複数選択できます。期間指定のないタグ集計は全期間、期間指定があればその範囲が対象です。`rules`モードでの自然文の記憶管理・タグ定義操作は対象外です。Web画面の機能はどちらのモードでも使えます。
+
+保存先は既存DynamoDBテーブルの`TAG`（タグ定義）、`AGENT_MEMORY_SHARED`（共通の注意事項）、`AGENT_MEMORY#<アプリユーザーID>`（個人向け注意事項）です。チケットの`tag_ids`で定義に紐付けます。実装は`backend/app/services/agent_preferences.py`、解析ルールはUTF-8の`backend/app/prompts/line_agent_intent.txt`、管理APIは`backend/app/routers/settings.py`です。追加のAWSリソースやIAM権限は不要ですが、フロントエンドのビルドとバックエンドの再デプロイの両方が必要です。現在のモデルIDとsessionSecretを引き継いでください。
 
 ### ツールとして想定している処理
 
@@ -524,7 +664,8 @@ Remove-Item -Recurse -Force .\dist-cdk -ErrorAction SilentlyContinue
 npm.cmd run build -- --outDir dist-cdk --emptyOutDir true
 
 cd ..\infra
-npx.cmd cdk deploy --profile household-admin -c sessionSecret="前回と同じ値"
+$sessionSecret = "保管している前回と同じ値"
+npx.cmd cdk deploy --profile household-admin -c sessionSecret="$sessionSecret"
 ```
 
 ### LINEで「このLINEユーザーIDは登録されていません」と表示される
@@ -541,6 +682,55 @@ LINEユーザーIDはMessaging API Channel内でユーザーごとに発行さ�
 - Channel secretとChannel access tokenがSSM Parameter Storeに登録されている
 - CDKデプロイ後のLambda環境変数が正しいSSMパラメータ名を参照している
 - CloudWatch LogsにLambdaエラーが出ていない
+
+### LINE AI処理の診断ログを確認する
+
+LINEからのチケット操作は、LambdaのCloudWatch LogsへJSON形式の診断ログを出力します。同じ会話は`conversation_id`、同じWebhookイベントは`request_id`で追跡できます。
+
+主なイベントは次のとおりです。
+
+| イベント | 内容 |
+| --- | --- |
+| `line_agent_message_started` | LINE入力の受付と現在の会話状態 |
+| `bedrock_intent_completed` | Bedrockが抽出した意図と項目、トークン使用量 |
+| `line_agent_create_candidate_created` | 最初に作成した登録候補 |
+| `line_agent_create_candidate_merged` | 修正前、修正指定、変更項目、修正後、値の抽出元 |
+| `line_agent_session_saved` | 確認待ち会話の保存 |
+| `line_agent_tool_executed` | チケット作成・更新・削除などの実行結果 |
+| `bedrock_intent_failed` / `line_reply_failed` | Bedrock解析またはLINE返信の失敗 |
+
+既定ではLINE本文を保存せず、文字数とSHA-256ハッシュだけを記録します。問題調査中だけ本文とBedrockの生出力を記録する場合は、CDKデプロイに次のコンテキストを追加します。
+
+```powershell
+npx.cmd cdk deploy --profile household-admin `
+  -c sessionSecret="$sessionSecret" `
+  -c lineAgentDiagnosticLogging=true `
+  -c lineAgentLogMessageText=true
+```
+
+調査後は`lineAgentLogMessageText=false`で再デプロイしてください。診断ログ全体を止める場合は`lineAgentDiagnosticLogging=false`を指定します。
+
+ロググループ名は次のコマンドで確認できます。
+
+```powershell
+aws cloudformation describe-stack-resources `
+  --profile household-admin `
+  --region ap-northeast-1 `
+  --stack-name HouseholdBudgetStack `
+  --logical-resource-id BackendLogGroup
+```
+
+取得したロググループ名を指定してリアルタイム表示します。
+
+```powershell
+aws logs tail "ロググループ名" `
+  --profile household-admin `
+  --region ap-northeast-1 `
+  --since 1h `
+  --follow
+```
+
+CloudWatch Logsの保持期間はCDKで1週間に設定しています。LINE Channel secret、アクセストークン、完全なLINEユーザーIDはログへ出力しません。
 
 ## ライセンス
 

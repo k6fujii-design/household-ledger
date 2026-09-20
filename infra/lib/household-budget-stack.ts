@@ -17,6 +17,15 @@ export class HouseholdBudgetStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
+    const sessionSecret = this.node.tryGetContext("sessionSecret");
+    if (typeof sessionSecret !== "string" || sessionSecret.trim().length < 32) {
+      throw new Error(
+        "CDK context 'sessionSecret' is required and must be at least 32 characters. " +
+        "Define $sessionSecret in the current PowerShell window, then deploy with " +
+        "-c sessionSecret=\"$sessionSecret\"."
+      );
+    }
+
     const table = new dynamodb.Table(this, "AppTable", {
       tableName: "household-budget-app",
       partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
@@ -49,6 +58,10 @@ export class HouseholdBudgetStack extends Stack {
       resourceName: lineChannelAccessTokenParameterName.replace(/^\//, "")
     });
     const lineAgentMode = this.node.tryGetContext("lineAgentMode") || "rules";
+    const lineOfficialAccountId = this.node.tryGetContext("lineOfficialAccountId") || "";
+    if (typeof lineOfficialAccountId !== "string" || (lineOfficialAccountId && !/^@[A-Za-z0-9_.-]{1,64}$/.test(lineOfficialAccountId))) {
+      throw new Error("lineOfficialAccountId must be the official account Basic/Premium ID starting with @, not a channel ID or user ID.");
+    }
     const bedrockModelId = this.node.tryGetContext("bedrockModelId") || "amazon.nova-lite-v1:0";
 
     const backend = new lambda.DockerImageFunction(this, "BackendFunction", {
@@ -62,14 +75,17 @@ export class HouseholdBudgetStack extends Stack {
       environment: {
         DYNAMODB_TABLE_NAME: table.tableName,
         DYNAMODB_AUTO_CREATE: "false",
-        SESSION_SECRET: this.node.tryGetContext("sessionSecret") || "change-me-after-deploy",
+        SESSION_SECRET: sessionSecret,
         INITIAL_USER_PASSWORD_PARAMETER_NAME: initialUserPasswordParameterName,
         INITIAL_USER_1_NAME: this.node.tryGetContext("initialUser1Name") || "User 1",
         INITIAL_USER_2_NAME: this.node.tryGetContext("initialUser2Name") || "User 2",
         LINE_CHANNEL_SECRET_PARAMETER_NAME: lineChannelSecretParameterName,
         LINE_CHANNEL_ACCESS_TOKEN_PARAMETER_NAME: lineChannelAccessTokenParameterName,
         LINE_AGENT_MODE: lineAgentMode,
+        LINE_OFFICIAL_ACCOUNT_ID: lineOfficialAccountId,
         LINE_AGENT_TRACE_ENABLED: this.node.tryGetContext("lineAgentTraceEnabled") || "true",
+        LINE_AGENT_DIAGNOSTIC_LOGGING: this.node.tryGetContext("lineAgentDiagnosticLogging") || "true",
+        LINE_AGENT_LOG_MESSAGE_TEXT: this.node.tryGetContext("lineAgentLogMessageText") || "false",
         BEDROCK_MODEL_ID: bedrockModelId
       }
     });

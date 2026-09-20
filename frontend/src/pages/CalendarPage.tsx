@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
-import type { CalendarDay, Category, Ticket, TicketStatus, User } from "../types";
+import type { CalendarDay, Category, Tag, Ticket, TicketStatus, User } from "../types";
 import { compactYen, formatYen } from "../utils/display";
 import { swipeDirection, type TouchPoint } from "../utils/swipe";
 
@@ -38,6 +38,9 @@ export function CalendarPage({
   const [month, setMonth] = useState(today.getMonth() + 1);
   const [filter, setFilter] = useState<CalendarFilter>("all");
   const [category, setCategory] = useState("");
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [tagId, setTagId] = useState("");
+  const [error, setError] = useState("");
   const [days, setDays] = useState<CalendarDay[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -46,41 +49,42 @@ export function CalendarPage({
   const dayMap = useMemo(() => Object.fromEntries(days.map((d) => [d.date, d])), [days]);
   const visibleTotal = useMemo(() => days.reduce((sum, day) => sum + day.total_amount, 0), [days]);
 
-  async function loadMonth() {
-    const res = await api.calendar(year, month, statusParam[filter], category);
-    setDays(res.days);
-  }
+  useEffect(() => {
+    api.tags().then(setTags).catch((e) => setError(e.message));
+  }, []);
 
   useEffect(() => {
-    loadMonth();
-  }, [year, month, filter, category]);
-
-  async function pick(date: string) {
-    setSelected(date);
-    if (filter === "all") {
-      const rows = await Promise.all(["new", "settled", "canceled"].map((status) => {
-        const params = new URLSearchParams({ from: date, to: date, status });
-        if (category) params.set("category", category);
-        return api.tickets(`?${params.toString()}`);
-      }));
-      setTickets(rows.flat());
-      return;
-    }
-    const params = new URLSearchParams({ from: date, to: date, status: filter });
-    if (category) params.set("category", category);
-    setTickets(await api.tickets(`?${params.toString()}`));
-  }
+    let active = true;
+    setDays([]);
+    setError("");
+    api.calendar(year, month, statusParam[filter], category, tagId)
+      .then((res) => { if (active) setDays(res.days); })
+      .catch((e) => { if (active) setError(e.message); });
+    return () => { active = false; };
+  }, [year, month, filter, category, tagId]);
 
   async function selectDate(date: string) {
-    await pick(date);
+    setSelected(date);
     if (confirm(`${date} のチケットを新規作成しますか？`)) {
       openCreate(date);
     }
   }
 
   useEffect(() => {
-    if (selected) pick(selected);
-  }, [filter, category]);
+    let active = true;
+    setTickets([]);
+    if (selected) {
+      const statuses = filter === "all" ? ["new", "settled", "canceled"] : [filter];
+      Promise.all(statuses.map((status) => {
+        const params = new URLSearchParams({ from: selected, to: selected, status });
+        if (category) params.set("category", category);
+        if (tagId) params.set("tag_id", tagId);
+        return api.tickets(`?${params.toString()}`);
+      })).then((rows) => { if (active) setTickets(rows.flat()); })
+        .catch((e) => { if (active) setError(e.message); });
+    }
+    return () => { active = false; };
+  }, [selected, filter, category, tagId]);
 
   function move(diff: number) {
     const d = new Date(year, month - 1 + diff, 1);
@@ -117,7 +121,12 @@ export function CalendarPage({
           <option value="">全カテゴリ</option>
           {categories.map((row) => <option key={row.id} value={row.name}>{row.name}</option>)}
         </select>
+        <label>タグ<select className="calendar-category" value={tagId} onChange={(e) => setTagId(e.target.value)}>
+          <option value="">すべてのチケット</option>
+          {tags.map((tag) => <option key={tag.id} value={tag.id}>#{tag.name}</option>)}
+        </select></label>
       </section>}
+      {error && <div className="error" role="alert">{error}</div>}
       <section className="calendar-summary">
         <span>月次表示合計</span>
         <strong>{formatYen(visibleTotal)}</strong>
