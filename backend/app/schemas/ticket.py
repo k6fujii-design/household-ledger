@@ -71,3 +71,13 @@ class BulkStatusRequest(BaseModel):
 class BulkStatusResponse(BaseModel):
     updated_count: int
     to_status: str
+
+
+class BulkTagsRequest(BaseModel):
+    ticket_ids: list[UUID] = Field(min_length=1, max_length=200)
+    tag_ids: list[UUID] = Field(min_length=1, max_length=20)
+
+
+class BulkTagsResponse(BaseModel):
+    updated_count: int
+    ticket_ids: list[UUID]

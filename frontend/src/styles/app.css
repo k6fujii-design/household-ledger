@@ -466,6 +466,13 @@ textarea { min-height: 86px; resize: vertical; }
 .tag-selector .preset-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .tag-selector .tag-choice { display: inline-flex; align-items: center; gap: 6px; width: auto; padding: 8px 10px; border: 1px solid #c9c8d7; border-radius: 6px; background: #f6f5fa; font-size: 13px; overflow-wrap: anywhere; }
 .tag-selector .tag-choice input { width: 18px; height: 18px; margin: 0; flex-shrink: 0; }
+.tag-multi-select { min-width: 0; margin: 0; padding: 10px; border: 1px solid #f0d9cc; border-radius: 8px; background: #fff; }
+.tag-multi-select legend { padding: 0 5px; color: #3e4a4f; font-size: 13px; font-weight: 800; }
+.tag-multi-options { display: flex; flex-wrap: wrap; gap: 7px; }
+.tag-multi-options label { display: inline-flex; width: auto; align-items: center; gap: 6px; padding: 7px 9px; border: 1px solid #d9d2cd; border-radius: 999px; background: #fff8ee; cursor: pointer; }
+.tag-multi-options label.selected { color: #fff; border-color: #2ec4b6; background: #2ec4b6; }
+.tag-multi-options input { width: 17px; min-height: 17px; margin: 0; box-shadow: none; accent-color: #08786b; }
+.tag-clear-button { min-height: 30px; margin-top: 8px; padding: 0 8px; color: #687277; background: transparent; border: 0; box-shadow: none; font-size: 12px; }
 .ticket-tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .ticket-tags:empty { display: none; }
 .ticket-tags span { background: #efedf7; color: #60577a; padding: 2px 6px; border-radius: 4px; font-size: 11px; overflow-wrap: anywhere; }
@@ -473,9 +480,23 @@ textarea { min-height: 86px; resize: vertical; }
 .summary-tag-filter select { min-width: 0; flex: 1; }
 .preference-panel form { display: grid; gap: 10px; }
 .preference-panel textarea { width: 100%; min-height: 80px; }
+.tag-name-input { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; overflow: hidden; border: 1px solid #f0d9cc; border-radius: 8px; background: rgba(255,255,255,.92); }
+.tag-name-input b { padding-left: 12px; color: #60577a; font-size: 18px; }
+.tag-name-input input { min-width: 0; border: 0; box-shadow: none; }
 .preference-list > div { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #ddd8d5; padding: 14px 0; }
 .preference-list span { flex: 1; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; font-size: 14px; }
 .preference-list .icon-button { flex-shrink: 0; }
+.bulk-ticket-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 12px; padding: 10px; border: 1px solid rgba(255, 170, 126, .34); border-radius: 8px; background: rgba(255,255,255,.9); }
+.bulk-ticket-toolbar label { display: inline-flex; width: auto; flex-direction: row; align-items: center; gap: 7px; }
+.bulk-ticket-toolbar input, .ticket-select input { width: 19px; min-height: 19px; margin: 0; box-shadow: none; accent-color: #2ec4b6; }
+.bulk-ticket-toolbar span { margin-right: auto; color: #687277; font-size: 12px; font-weight: 800; }
+.bulk-tag-panel { display: grid; gap: 10px; margin-bottom: 12px; padding: 12px; border: 1px solid rgba(46, 196, 182, .38); border-radius: 8px; background: #f4fbf7; }
+.bulk-tag-panel p { margin: 0; }
+.selectable-ticket { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; border-radius: 8px; }
+.selectable-ticket.selected { outline: 2px solid #2ec4b6; outline-offset: 2px; }
+.ticket-select { display: grid; place-items: center; }
+.selectable-ticket .ticket-card { min-width: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .summary-period-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .summary-period-tabs button { min-width: 0; font-size: 16px; padding-inline: 8px; }
 .memory-scopes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 16px; }

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { api } from "../api/client";
 import { ShareBar } from "../components/ShareBar";
 import { CategoryIcon, categoryForName } from "../components/CategoryIcon";
+import { TagMultiSelect } from "../components/TagMultiSelect";
 import type { AppSettings, Category, MonthlySettlement, Summary, Ticket, User } from "../types";
 import { formatYen } from "../utils/display";
 import { addMonths, currentPeriod, monthLabel } from "../utils/period";
@@ -42,7 +43,7 @@ export function SummaryPage({ users, categories, settings }: { users: User[]; ca
   const [category, setCategory] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [tags, setTags] = useState<import("../types").Tag[]>([]);
-  const [tagId, setTagId] = useState("");
+  const [tagIds, setTagIds] = useState<string[]>([]);
   useEffect(() => { api.tags().then(setTags).catch(() => setMessage("タグの取得に失敗しました")); }, []);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -58,8 +59,8 @@ export function SummaryPage({ users, categories, settings }: { users: User[]; ca
 
   async function load() {
     const [summaryRow, ticketRows] = await Promise.all([
-      api.summary(period.from, period.to, "new,settled", category, tagId),
-      api.tickets(`?from=${period.from}&to=${period.to}${category ? `&category=${encodeURIComponent(category)}` : ""}${tagId ? `&tag_id=${encodeURIComponent(tagId)}` : ""}`)
+      api.summary(period.from, period.to, "new,settled", category, tagIds),
+      api.tickets(`?from=${period.from}&to=${period.to}${category ? `&category=${encodeURIComponent(category)}` : ""}${tagIds.length ? `&tag_ids=${encodeURIComponent(tagIds.join(","))}` : ""}`)
     ]);
     setSummary(summaryRow);
     setTickets(ticketRows.filter((ticket) => ticket.status !== "canceled"));
@@ -73,7 +74,7 @@ export function SummaryPage({ users, categories, settings }: { users: User[]; ca
 
   useEffect(() => {
     load().catch((e) => setMessage(e.message));
-  }, [period.from, period.to, category, mode, tagId]);
+  }, [period.from, period.to, category, mode, tagIds]);
 
   const categoryRows = useMemo(() => {
     const map = new Map<string, { name: string; amount: number; ratioF: number; ratioO: number; shareF: number; shareO: number; count: number; color: string; category?: Category }>();
@@ -168,14 +169,14 @@ export function SummaryPage({ users, categories, settings }: { users: User[]; ca
         <strong>{mode === "all" ? "全期間" : mode === "month" ? monthLabel(baseMonth) : `${baseMonth.getFullYear()}年`}</strong>
         <button className="ghost-icon" disabled={mode === "all"} onClick={() => move(1)}><ChevronRight /></button>
       </header>
-      <button className="secondary filter-toggle" aria-expanded={showFilters} aria-controls="summary-filters" onClick={() => setShowFilters(!showFilters)}><SlidersHorizontal size={18} />フィルター{(category || tagId) ? "（適用中）" : ""}</button>
+      <button className="secondary filter-toggle" aria-expanded={showFilters} aria-controls="summary-filters" onClick={() => setShowFilters(!showFilters)}><SlidersHorizontal size={18} />フィルター{(category || tagIds.length) ? "（適用中）" : ""}</button>
       {showFilters && <section id="summary-filters" className="calendar-filter-panel">
       <select aria-label="カテゴリ" className="calendar-category" value={category} onChange={(e) => setCategory(e.target.value)}>
         <option value="">全カテゴリ</option>
         {categories.map((row) => <option key={row.id} value={row.name}>{row.name}</option>)}
       </select>
 
-      <label className="summary-tag-filter">タグ<select value={tagId} onChange={(e) => setTagId(e.target.value)}><option value="">すべてのチケット</option>{tags.map((tag) => <option key={tag.id} value={tag.id}>#{tag.name}</option>)}</select></label>
+      <TagMultiSelect tags={tags} selected={tagIds} onChange={setTagIds} label="タグ（いずれかを含む）" />
       </section>}
       <section className="summary-visual summary-visual-premium">
         <div className="donut-wrap">

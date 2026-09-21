@@ -20,8 +20,10 @@ def summary(
     statuses: str | None = None,
     category: str | None = None,
     tag_id: str | None = None,
+    tag_ids: str | None = None,
     store: DynamoStore = Depends(get_store),
     user: dict = Depends(current_user),
 ):
     status_list = active_statuses(statuses.split(",") if statuses else None)
-    return store.summarize(from_, to, status_list, category, tag_id)
+    selected_tag_ids = [value for value in (tag_ids or "").split(",") if value]
+    return store.summarize(from_, to, status_list, category, tag_id, selected_tag_ids)

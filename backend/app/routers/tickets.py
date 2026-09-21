@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.routers.deps import current_user
-from app.schemas.ticket import BulkStatusRequest, BulkStatusResponse, TicketCreate, TicketOut, TicketUpdate
+from app.schemas.ticket import BulkStatusRequest, BulkStatusResponse, BulkTagsRequest, BulkTagsResponse, TicketCreate, TicketOut, TicketUpdate
 from app.store import DynamoStore, get_store
 
 router = APIRouter(prefix="/api/tickets", tags=["tickets"])
@@ -19,10 +19,12 @@ def list_tickets(
     payer_user_id: UUID | None = None,
     keyword: str | None = None,
     tag_id: str | None = None,
+    tag_ids: str | None = None,
     store: DynamoStore = Depends(get_store),
     user: dict = Depends(current_user),
 ):
-    return store.list_tickets(from_, to, status=status, category=category, payer_user_id=payer_user_id, keyword=keyword, tag_id=tag_id)
+    selected_tag_ids = [value for value in (tag_ids or "").split(",") if value]
+    return store.list_tickets(from_, to, status=status, category=category, payer_user_id=payer_user_id, keyword=keyword, tag_id=tag_id, tag_ids=selected_tag_ids)
 
 
 @router.post("", response_model=TicketOut)
@@ -58,6 +60,27 @@ def bulk_status(payload: BulkStatusRequest, request: Request, store: DynamoStore
         user_agent=request.headers.get("user-agent"),
     )
     return {"updated_count": updated_count, "to_status": "settled"}
+
+
+@router.post("/bulk-tags", response_model=BulkTagsResponse)
+def bulk_add_tags(payload: BulkTagsRequest, request: Request, store: DynamoStore = Depends(get_store), user: dict = Depends(current_user)):
+    try:
+        updated_count, ids = store.bulk_add_tags(
+            [str(value) for value in payload.ticket_ids],
+            [str(value) for value in payload.tag_ids],
+            UUID(user["id"]),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    store.write_audit(
+        "ticket_bulk_tag_add",
+        "ticket",
+        user["id"],
+        after={"tag_ids": [str(value) for value in payload.tag_ids], "updated_count": updated_count, "ticket_ids": ids},
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    return {"updated_count": updated_count, "ticket_ids": ids}
 
 
 @router.get("/{ticket_id}", response_model=TicketOut)

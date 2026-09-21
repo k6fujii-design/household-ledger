@@ -46,21 +46,21 @@ export const api = {
   updateTicket: (id: string, payload: TicketInput) =>
     request<Ticket>(`/api/tickets/${id}`, { method: "PUT", headers: jsonHeaders, body: JSON.stringify(payload) }),
   deleteTicket: (id: string) => request<{ ok: boolean }>(`/api/tickets/${id}`, { method: "DELETE" }),
-  summary: (from: string, to: string, statuses = "new,settled", category = "", tagId = "") => {
+  summary: (from: string, to: string, statuses = "new,settled", category = "", tagIds: string[] = []) => {
     const params = new URLSearchParams({ from, to, statuses });
-    if (tagId) params.set("tag_id", tagId);
+    if (tagIds.length) params.set("tag_ids", tagIds.join(","));
     if (category) params.set("category", category);
     return request<Summary>(`/api/reports/summary?${params.toString()}`);
   },
-  calendar: (year: number, month: number, statuses = "new,settled", category = "", tagId = "") => {
+  calendar: (year: number, month: number, statuses = "new,settled", category = "", tagIds: string[] = []) => {
     const params = new URLSearchParams({ year: String(year), month: String(month), statuses });
-    if (tagId) params.set("tag_id", tagId);
+    if (tagIds.length) params.set("tag_ids", tagIds.join(","));
     if (category) params.set("category", category);
     return request<{ year: number; month: number; days: CalendarDay[] }>(`/api/calendar/month?${params.toString()}`);
   },
-  calendarYear: (year: number, statuses = "new,settled", category = "", tagId = "") => {
+  calendarYear: (year: number, statuses = "new,settled", category = "", tagIds: string[] = []) => {
     const params = new URLSearchParams({ year: String(year), statuses });
-    if (tagId) params.set("tag_id", tagId);
+    if (tagIds.length) params.set("tag_ids", tagIds.join(","));
     if (category) params.set("category", category);
     return request<{ year: number; months: CalendarMonthSummary[] }>(`/api/calendar/year?${params.toString()}`);
   },
@@ -69,6 +69,12 @@ export const api = {
       method: "POST",
       headers: jsonHeaders,
       body: JSON.stringify({ from, to, from_status: "new", to_status: "settled" })
+    }),
+  bulkAddTags: (ticketIds: string[], tagIds: string[]) =>
+    request<{ updated_count: number; ticket_ids: string[] }>("/api/tickets/bulk-tags", {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ ticket_ids: ticketIds, tag_ids: tagIds })
     }),
   settings: () => request<AppSettings>("/api/settings"),
   updateSettings: (payload: AppSettings) => request<AppSettings>("/api/settings", { method: "PUT", headers: jsonHeaders, body: JSON.stringify(payload) }),

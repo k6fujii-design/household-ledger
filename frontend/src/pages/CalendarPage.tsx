@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { CalendarDay, Category, Tag, Ticket, TicketStatus, User } from "../types";
 import { compactYen, formatYen } from "../utils/display";
+import { TagMultiSelect } from "../components/TagMultiSelect";
 import { swipeDirection, type TouchPoint } from "../utils/swipe";
 
 type CalendarFilter = "all" | TicketStatus;
@@ -39,7 +40,7 @@ export function CalendarPage({
   const [filter, setFilter] = useState<CalendarFilter>("all");
   const [category, setCategory] = useState("");
   const [tags, setTags] = useState<Tag[]>([]);
-  const [tagId, setTagId] = useState("");
+  const [tagIds, setTagIds] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [days, setDays] = useState<CalendarDay[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -57,11 +58,11 @@ export function CalendarPage({
     let active = true;
     setDays([]);
     setError("");
-    api.calendar(year, month, statusParam[filter], category, tagId)
+    api.calendar(year, month, statusParam[filter], category, tagIds)
       .then((res) => { if (active) setDays(res.days); })
       .catch((e) => { if (active) setError(e.message); });
     return () => { active = false; };
-  }, [year, month, filter, category, tagId]);
+  }, [year, month, filter, category, tagIds]);
 
   async function selectDate(date: string) {
     setSelected(date);
@@ -78,13 +79,13 @@ export function CalendarPage({
       Promise.all(statuses.map((status) => {
         const params = new URLSearchParams({ from: selected, to: selected, status });
         if (category) params.set("category", category);
-        if (tagId) params.set("tag_id", tagId);
+        if (tagIds.length) params.set("tag_ids", tagIds.join(","));
         return api.tickets(`?${params.toString()}`);
       })).then((rows) => { if (active) setTickets(rows.flat()); })
         .catch((e) => { if (active) setError(e.message); });
     }
     return () => { active = false; };
-  }, [selected, filter, category, tagId]);
+  }, [selected, filter, category, tagIds]);
 
   function move(diff: number) {
     const d = new Date(year, month - 1 + diff, 1);
@@ -112,7 +113,7 @@ export function CalendarPage({
         <h1>{year}年{month}月</h1>
         <button onClick={() => move(1)} aria-label="翌月"><ChevronRight /></button>
       </header>
-      <button className="secondary filter-toggle" onClick={() => setShowFilters(!showFilters)}><SlidersHorizontal size={18} />フィルター</button>
+      <button className="secondary filter-toggle" onClick={() => setShowFilters(!showFilters)}><SlidersHorizontal size={18} />フィルター{(category || tagIds.length || filter !== "all") ? "（適用中）" : ""}</button>
       {showFilters && <section className="calendar-filter-panel">
         <div className="segmented">
           {(Object.keys(statusLabel) as CalendarFilter[]).map((key) => <button key={key} className={filter === key ? "on" : ""} onClick={() => setFilter(key)}>{statusLabel[key]}</button>)}
@@ -121,10 +122,7 @@ export function CalendarPage({
           <option value="">全カテゴリ</option>
           {categories.map((row) => <option key={row.id} value={row.name}>{row.name}</option>)}
         </select>
-        <label>タグ<select className="calendar-category" value={tagId} onChange={(e) => setTagId(e.target.value)}>
-          <option value="">すべてのチケット</option>
-          {tags.map((tag) => <option key={tag.id} value={tag.id}>#{tag.name}</option>)}
-        </select></label>
+        <TagMultiSelect tags={tags} selected={tagIds} onChange={setTagIds} label="タグ（いずれかを含む）" />
       </section>}
       {error && <div className="error" role="alert">{error}</div>}
       <section className="calendar-summary">

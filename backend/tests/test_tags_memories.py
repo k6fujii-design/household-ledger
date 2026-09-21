@@ -95,6 +95,31 @@ class TagsAndMemoriesTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.store.delete_tag(renamed["id"])
 
+    def test_multiple_tag_filter_matches_any_tag_without_duplicates(self):
+        other_tag = self.store.save_tag("#家族旅行")
+        first = self.store.create_ticket(self.ticket(), UUID(self.user["id"]))
+        second = self.store.create_ticket(self.ticket(title="移動", amount=2000, tag_ids=[other_tag["id"]]), UUID(self.user["id"]))
+        both = self.store.create_ticket(self.ticket(title="宿泊", amount=3000, tag_ids=[self.tag["id"], other_tag["id"]]), UUID(self.user["id"]))
+
+        rows = self.store.list_tickets(tag_ids=[self.tag["id"], other_tag["id"]])
+
+        self.assertEqual({row["id"] for row in rows}, {first["id"], second["id"], both["id"]})
+        self.assertEqual(self.store.summarize(date.min, date.max, ["new"], tag_ids=[self.tag["id"], other_tag["id"]])["total_amount"], 6000)
+
+    def test_bulk_add_tags_preserves_existing_tags_and_skips_unchanged_tickets(self):
+        other_tag = self.store.save_tag("家族旅行")
+        first = self.store.create_ticket(self.ticket(), UUID(self.user["id"]))
+        second = self.store.create_ticket(self.ticket(title="移動", tag_ids=[]), UUID(self.user["id"]))
+
+        count, updated_ids = self.store.bulk_add_tags([first["id"], second["id"]], [other_tag["id"]], UUID(self.user["id"]))
+        repeated_count, _ = self.store.bulk_add_tags([first["id"], second["id"]], [other_tag["id"]], UUID(self.user["id"]))
+
+        self.assertEqual(count, 2)
+        self.assertEqual(set(updated_ids), {first["id"], second["id"]})
+        self.assertEqual(set(self.store.get_ticket(UUID(first["id"]))["tag_ids"]), {self.tag["id"], other_tag["id"]})
+        self.assertEqual(self.store.get_ticket(UUID(second["id"]))["tag_ids"], [other_tag["id"]])
+        self.assertEqual(repeated_count, 0)
+
     def test_unknown_tag_rejected(self):
         with self.assertRaises(ValueError):
             self.store.create_ticket(self.ticket(tag_ids=[uuid4()]), UUID(self.user["id"]))

@@ -347,6 +347,7 @@ class DynamoStore:
         payer_user_id: UUID | None = None,
         keyword: str | None = None,
         tag_id: str | None = None,
+        tag_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         rows = [row for row in self._items("TICKET") if not row.get("deleted_at")]
         if from_date:
@@ -365,8 +366,9 @@ class DynamoStore:
             rows = [row for row in rows if row["payer_user_id"] == str(payer_user_id)]
         if keyword:
             rows = [row for row in rows if keyword.lower() in row["title"].lower()]
-        if tag_id:
-            rows = [row for row in rows if tag_id in row.get("tag_ids", [])]
+        selected_tag_ids = set(tag_ids or ([tag_id] if tag_id else []))
+        if selected_tag_ids:
+            rows = [row for row in rows if selected_tag_ids.intersection(row.get("tag_ids", []))]
         rows.sort(key=lambda row: (row["date"], row["created_at"]), reverse=True)
         display_ids = self.ticket_display_ids()
         return [self.with_payer_name(row, display_ids) for row in rows]
@@ -403,6 +405,37 @@ class DynamoStore:
             ids.append(row["id"])
         return len(ids), ids
 
+    def bulk_add_tags(self, ticket_ids: list[str], tag_ids: list[str], actor_id: UUID) -> tuple[int, list[str]]:
+        unique_ticket_ids = list(dict.fromkeys(ticket_ids))
+        unique_tag_ids = list(dict.fromkeys(tag_ids))
+        if not unique_ticket_ids:
+            raise ValueError("チケットを1件以上選択してください。")
+        if not unique_tag_ids:
+            raise ValueError("追加するタグを1件以上選択してください。")
+        if any(not self._get("TAG", tag_id) for tag_id in unique_tag_ids):
+            raise ValueError("設定に存在しないタグが指定されています。")
+
+        rows: list[dict[str, Any]] = []
+        for ticket_id in unique_ticket_ids:
+            row = self._get("TICKET", ticket_id)
+            if not row or row.get("deleted_at"):
+                raise ValueError("選択したチケットが見つかりません。再読み込みしてください。")
+            rows.append(row)
+
+        timestamp = now_iso()
+        updated_ids: list[str] = []
+        for row in rows:
+            before = row.get("tag_ids", [])
+            after = list(dict.fromkeys([*before, *unique_tag_ids]))
+            if after == before:
+                continue
+            row["tag_ids"] = after
+            row["updated_by"] = str(actor_id)
+            row["updated_at"] = timestamp
+            self._put("TICKET", row["id"], row)
+            updated_ids.append(row["id"])
+        return len(updated_ids), updated_ids
+
     def ticket_display_ids(self) -> dict[str, int]:
         rows = [row for row in self._items("TICKET") if not row.get("deleted_at")]
         rows.sort(key=lambda row: (row["date"], row["created_at"], row["id"]))
@@ -434,8 +467,8 @@ class DynamoStore:
             "tag_ids": ticket.get("tag_ids", []),
         }
 
-    def summarize(self, from_date: date, to_date: date, statuses: list[str], category: str | None = None, tag_id: str | None = None) -> dict[str, Any]:
-        tickets = self.list_tickets(from_date, to_date, statuses=statuses, category=category, tag_id=tag_id)
+    def summarize(self, from_date: date, to_date: date, statuses: list[str], category: str | None = None, tag_id: str | None = None, tag_ids: list[str] | None = None) -> dict[str, Any]:
+        tickets = self.list_tickets(from_date, to_date, statuses=statuses, category=category, tag_id=tag_id, tag_ids=tag_ids)
         users = {row["email"]: row for row in self.list_users()}
         user_f = users.get("f@example.com")
         user_o = users.get("o@example.com")

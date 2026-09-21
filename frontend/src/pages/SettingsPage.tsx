@@ -40,6 +40,7 @@ const actionLabels: Record<string, string> = {
   setting_create_tag: "タグ追加",
   setting_update_tag: "タグ編集",
   setting_delete_tag: "タグ削除",
+  ticket_bulk_tag_add: "タグ一括付与",
   agent_memory_create: "AIの記憶追加",
   agent_memory_delete: "AIの記憶削除",
   setting_update_monthly_settlement: "月次メモ更新"
